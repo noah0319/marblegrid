@@ -11,6 +11,12 @@ interface TestPostResult {
   error?: string
 }
 
+interface PreviewPostResult {
+  success: boolean
+  message?: string
+  error?: string
+}
+
 export default function Settings(): React.JSX.Element {
   const [status, setStatus] = useState<TwitchStatus | null>(null)
   const [clientId, setClientId] = useState('')
@@ -20,6 +26,8 @@ export default function Settings(): React.JSX.Element {
   const [connecting, setConnecting] = useState(false)
   const [testResult, setTestResult] = useState<TestPostResult | null>(null)
   const [testing, setTesting] = useState(false)
+  const [previewResult, setPreviewResult] = useState<PreviewPostResult | null>(null)
+  const [previewing, setPreviewing] = useState(false)
 
   const refresh = useCallback(async () => {
     const res = await fetch(`${BASE}/api/twitch/status`)
@@ -94,6 +102,21 @@ export default function Settings(): React.JSX.Element {
       setTestResult((await res.json()) as TestPostResult)
     } finally {
       setTesting(false)
+    }
+  }
+
+  // Sends the real formatted message for whatever race/tilt/royale was most
+  // recently captured — same wording a real auto-post would use — so Noah
+  // can judge how it actually reads in chat without waiting for a fresh
+  // race. Deliberately separate from the auto-post bookkeeping server-side.
+  async function sendPreviewPost(): Promise<void> {
+    setPreviewing(true)
+    setPreviewResult(null)
+    try {
+      const res = await fetch(`${BASE}/api/twitch/preview-post`, { method: 'POST' })
+      setPreviewResult((await res.json()) as PreviewPostResult)
+    } finally {
+      setPreviewing(false)
     }
   }
 
@@ -187,12 +210,32 @@ export default function Settings(): React.JSX.Element {
               >
                 {testing ? 'Sending…' : 'Send test post'}
               </button>
+              <button
+                type="button"
+                className="settings__btn"
+                disabled={previewing}
+                onClick={() => void sendPreviewPost()}
+              >
+                {previewing ? 'Sending…' : 'Preview last result in chat'}
+              </button>
             </div>
             {testResult && (
               <p className={`settings__test-result ${testResult.success ? 'settings__test-result--ok' : 'settings__test-result--fail'}`}>
                 {testResult.success ? '✓ Sent — check your chat.' : `✗ ${testResult.error ?? 'Failed to send.'}`}
               </p>
             )}
+            {previewResult && (
+              <p className={`settings__test-result ${previewResult.success ? 'settings__test-result--ok' : 'settings__test-result--fail'}`}>
+                {previewResult.success
+                  ? `✓ Sent: "${previewResult.message}"`
+                  : `✗ ${previewResult.error ?? 'Failed to send.'}`}
+              </p>
+            )}
+            <p className="settings__hint">
+              &quot;Preview last result&quot; re-sends whatever race/tilt/royale was most recently captured, using
+              the exact wording a real auto-post would use — handy for checking formatting without waiting for a
+              fresh race. It does not affect auto-post&apos;s own record of what has already been announced.
+            </p>
 
             <label className="settings__toggle">
               <input
