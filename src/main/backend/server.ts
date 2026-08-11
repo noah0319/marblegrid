@@ -26,8 +26,22 @@ export async function startServer(port: number): Promise<void> {
   app.use(express.json())
 
   // Permissive CORS is fine here — everything is 127.0.0.1-only already.
-  app.use((_req, res, next) => {
+  // Must handle the preflight properly, not just tag the real response: the
+  // dev-mode renderer is served from Vite's own origin (http://localhost:*),
+  // a different origin from this server (http://127.0.0.1:*), so any POST
+  // with a JSON body (credentials, auto-post) triggers a real CORS preflight
+  // first. Only setting Allow-Origin (no Allow-Methods/Allow-Headers, no
+  // explicit OPTIONS response) made that preflight fail silently — the
+  // browser never even sent the real POST, and nothing surfaced an error.
+  // Found via a real repro: Settings' "Save credentials" did nothing.
+  app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*')
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.header('Access-Control-Allow-Headers', 'Content-Type')
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204)
+      return
+    }
     next()
   })
 

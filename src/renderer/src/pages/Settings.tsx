@@ -16,6 +16,7 @@ export default function Settings(): React.JSX.Element {
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [testResult, setTestResult] = useState<TestPostResult | null>(null)
   const [testing, setTesting] = useState(false)
@@ -44,13 +45,23 @@ export default function Settings(): React.JSX.Element {
 
   async function saveCredentials(): Promise<void> {
     setSaving(true)
+    setSaveError(null)
     try {
-      await fetch(`${BASE}/api/twitch/credentials`, {
+      const res = await fetch(`${BASE}/api/twitch/credentials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, clientSecret })
       })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? `Save failed (HTTP ${res.status})`)
+      }
       await refresh()
+    } catch (err) {
+      // A save that silently does nothing is worse than an ugly error message
+      // — that's exactly the shape of bug this replaces (see server.ts's CORS
+      // preflight fix): the fetch used to fail with zero visible feedback.
+      setSaveError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
     }
@@ -148,6 +159,9 @@ export default function Settings(): React.JSX.Element {
                 {connecting ? 'Waiting for you to authorize…' : 'Connect Twitch Account'}
               </button>
             </div>
+            {saveError && (
+              <p className="settings__test-result settings__test-result--fail">✗ {saveError}</p>
+            )}
             {connecting && (
               <p className="settings__hint">
                 A browser tab should have opened to Twitch's own site. Authorize there — this page updates
