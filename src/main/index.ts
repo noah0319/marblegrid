@@ -11,6 +11,13 @@ let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let quitting = false
 
+// build/icon.ico is the app's real logo (Noah's marble-in-a-grid render —
+// see 06 Attachments/ for the source and tools/build-icon.mjs for how the
+// multi-res .ico gets regenerated if it ever changes). app.getAppPath()
+// resolves to the project root in dev; a packaged build (Phase 6) will need
+// this revisited once electron-builder's asar/resources layout is in play.
+const appIcon = nativeImage.createFromPath(join(app.getAppPath(), 'build', 'icon.ico'))
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1100,
@@ -18,6 +25,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0a0a0f',
+    icon: appIcon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -48,8 +56,7 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  // TODO(Phase 3): swap for a real icon asset once visual design lands.
-  tray = new Tray(nativeImage.createEmpty())
+  tray = new Tray(appIcon.resize({ width: 32, height: 32 }))
   tray.setToolTip('MarbleGrid')
   tray.setContextMenu(
     Menu.buildFromTemplate([

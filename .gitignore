@@ -6,6 +6,5 @@ data/*.db-shm
 .env
 dist/
 out/
-build/
 *.log
 tools/shots/
