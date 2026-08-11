@@ -39,6 +39,17 @@ export function ingestRaceFromText(summaryText: string, participantsText: string
   if (summaryRows.length === 0) return null
   const summary = RaceSummarySchema.parse(summaryRows[0])
 
+  // Confirmed live on 2026-08-11: the game can write Status "Error" (at
+  // least) alongside completely blank participant point fields (not "0" —
+  // empty string). zod's coerce.number() turns '' into 0 without throwing,
+  // so an unfiltered ingest would silently record a broken race as a real
+  // one with everyone scoring 0 — exactly the kind of bad data a Phase 5
+  // chat post must never announce. Only "Final" is a genuinely completed
+  // race; anything else is still captured in raw_snapshots (the safety net
+  // in fileWatcher.ts runs before this function either way) but never
+  // becomes a typed event.
+  if (summary.Status !== 'Final') return null
+
   const participants = participantRows
     .filter((r) => r.SnapshotId === summary.SnapshotId)
     .map((r) => RaceParticipantSchema.parse(r))

@@ -27,8 +27,18 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [react()]
-    // overlay/ (the OBS browser-source page) gets wired in as a second build
-    // entry in Phase 4 — see 01 Architecture & Design/(C) implementation-plan.md
+    plugins: [react()],
+    build: {
+      rollupOptions: {
+        // Two HTML entries in the same renderer root (simpler and more
+        // reliable with Vite's dev/build tooling than a separate top-level
+        // overlay/ folder outside this root, which the original plan
+        // sketched — see the Phase 4 iteration log for why this changed).
+        input: {
+          index: resolve('src/renderer/index.html'),
+          overlay: resolve('src/renderer/overlay.html')
+        }
+      }
+    }
   }
 })

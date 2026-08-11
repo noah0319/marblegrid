@@ -1,0 +1,8 @@
+/* Overlay-specific: transparent page (not the dashboard's dark surface), and
+   nothing should ever scroll — OBS crops to the source's fixed frame. */
+html,
+body {
+  background: transparent !important;
+  margin: 0;
+  overflow: hidden;
+}

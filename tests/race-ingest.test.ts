@@ -133,3 +133,42 @@ test('ingesting the same royale content twice does not duplicate it (content-has
   const count = db.prepare('SELECT COUNT(*) as c FROM royale_events').get() as { c: number }
   assert.equal(count.c, 1)
 })
+
+test('a Status: Error race (real data, captured live 2026-08-11 on "Buckshot") is never recorded as a real event', () => {
+  // Confirmed live: the game writes a row for an errored race with the
+  // point fields completely blank (not "0") — zod's coerce.number() turns
+  // '' into 0 without throwing, so this specifically guards against
+  // silently recording a broken race as a real one where everyone "scored 0."
+  const raceEventId = ingestRaceFromText(
+    read('race-summary-error-sample.csv'),
+    read('race-participants-error-sample.csv')
+  )
+  assert.equal(raceEventId, null)
+
+  const db = getDb()
+  const eventCount = db.prepare('SELECT COUNT(*) as c FROM race_events').get() as { c: number }
+  assert.equal(eventCount.c, 0)
+  const participantCount = db.prepare('SELECT COUNT(*) as c FROM race_participants').get() as {
+    c: number
+  }
+  assert.equal(participantCount.c, 0)
+})
+
+test('an errored race does not pollute season stats even if a valid race is also ingested', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  ingestRaceFromText(read('race-summary-error-sample.csv'), read('race-participants-error-sample.csv'))
+
+  const db = getDb()
+  const eventCount = db.prepare('SELECT COUNT(*) as c FROM race_events').get() as { c: number }
+  assert.equal(eventCount.c, 1) // only the valid "feel the fire" race counts
+})
+
+test('the same Status guard applies to Tilt (no real errored sample exists yet, so this simulates one)', () => {
+  const erroredLevelText = read('tilt-level-sample.csv').replace(',Final,', ',Error,')
+  const tiltEventId = ingestTiltFromText(erroredLevelText, read('tilt-players-sample.csv'))
+  assert.equal(tiltEventId, null)
+
+  const db = getDb()
+  const count = db.prepare('SELECT COUNT(*) as c FROM tilt_events').get() as { c: number }
+  assert.equal(count.c, 0)
+})

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, dialog } from 'electron'
 import { join } from 'path'
 import { startServer } from './backend/server.ts'
 import { initDb } from './backend/db/db.ts'
@@ -65,16 +65,55 @@ function createTray(): void {
   )
 }
 
-// Do NOT quit when every window is closed — the backend (watcher, db, chat
-// poster) needs to keep running for the whole stream regardless of whether
-// the companion window is open.
-app.on('window-all-closed', () => {})
+// Single-instance lock: caught a real bug during Phase 4 testing where two
+// launch attempts overlapped, the second silently failed to bind the port
+// (no error surfaced anywhere — see below), and left zombie processes
+// holding the port hostage for later launches too. Without this, a second
+// double-click of the desktop shortcut mid-stream would be a confusing,
+// hard-to-diagnose failure at exactly the worst time.
+const gotLock = app.requestSingleInstanceLock()
 
-app.whenReady().then(async () => {
-  initDb(join(app.getPath('userData'), 'marblegrid.db'))
-  reconcileSeasonsAtStartup()
-  startWatcher()
-  await startServer(SERVER_PORT)
-  createWindow()
-  createTray()
-})
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    // Someone tried to launch a second copy — surface the existing window
+    // instead of doing nothing (or worse, silently failing to start).
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+
+  // Do NOT quit when every window is closed — the backend (watcher, db, chat
+  // poster) needs to keep running for the whole stream regardless of whether
+  // the companion window is open.
+  app.on('window-all-closed', () => {})
+
+  app.whenReady().then(async () => {
+    try {
+      initDb(join(app.getPath('userData'), 'marblegrid.db'))
+      reconcileSeasonsAtStartup()
+      startWatcher()
+      await startServer(SERVER_PORT)
+      createWindow()
+      createTray()
+    } catch (err) {
+      // A silent startup failure (this is exactly what happened before this
+      // fix: a port conflict threw here, nothing caught it, and the app sat
+      // running with zero windows and zero explanation) is worse than a
+      // blunt error box — at least this is diagnosable.
+      const message = err instanceof Error ? err.message : String(err)
+      // eslint-disable-next-line no-console
+      console.error('MarbleGrid failed to start:', err)
+      dialog.showErrorBox(
+        'MarbleGrid failed to start',
+        `Something went wrong during startup:\n\n${message}\n\n` +
+          'If this keeps happening, check Task Manager for a leftover "Electron" ' +
+          'or "node" process from MarbleGrid and end it, then try again.'
+      )
+      app.quit()
+    }
+  })
+}

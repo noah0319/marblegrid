@@ -31,6 +31,10 @@ export function ingestTiltFromText(levelText: string, playersText: string): numb
   if (levelRows.length === 0) return null
   const level = TiltLevelSchema.parse(levelRows[0])
 
+  // Same guard as race.ts's Status check — see that file's comment for the
+  // real "Buckshot" Status: Error case this was built against.
+  if (level.Status !== 'Final') return null
+
   const players = playerRows
     .filter((r) => r.SnapshotId === level.SnapshotId)
     .map((r) => TiltParticipantSchema.parse(r))

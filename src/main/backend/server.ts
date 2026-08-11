@@ -1,11 +1,13 @@
 import express from 'express'
 import { createServer } from 'http'
+import { join } from 'path'
 import { WebSocketServer } from 'ws'
 import { registerWss } from './ws.ts'
 import { getDb } from './db/db.ts'
 import { getOpenSeasonId } from './db/queries/seasons.ts'
 import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
 import { getLeaderboard } from './db/queries/leaderboard.ts'
+import { getLatestEvent } from './db/queries/latestEvent.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 
 /**
@@ -40,6 +42,9 @@ export async function startServer(port: number): Promise<void> {
     const limit = Number(req.query['limit']) || 20
     res.json(getLeaderboard(getOpenSeasonId(), limit))
   })
+  app.get('/api/latest-event', (_req, res) => {
+    res.json(getLatestEvent())
+  })
 
   // Phase 1 debug routes — let us (and Noah) see raw ingested events without
   // waiting for the real Phase 3 dashboard. Not the final API shape; Phase 2
@@ -59,6 +64,18 @@ export async function startServer(port: number): Promise<void> {
   app.get('/api/debug/seasons', (_req, res) => {
     const db = getDb()
     res.json(db.prepare('SELECT * FROM seasons ORDER BY id DESC').all())
+  })
+
+  // Phase 4 — serves the built renderer output over HTTP so OBS's Browser
+  // Source (which needs a real URL, unlike the desktop window's loadFile())
+  // can reach the overlay. __dirname here is out/main/ (electron-vite bundles
+  // the whole main process into one file), so '../renderer' is out/renderer/.
+  // Only reflects whatever the last `npm run build` produced — the dev-mode
+  // hot-reload server the desktop window uses doesn't drive this route; run
+  // `npm run build` after overlay changes for OBS to see them.
+  app.use(express.static(join(__dirname, '../renderer')))
+  app.get('/overlay', (_req, res) => {
+    res.sendFile(join(__dirname, '../renderer/overlay.html'))
   })
 
   const httpServer = createServer(app)

@@ -8,6 +8,7 @@
 import { _electron as electron } from 'playwright-core'
 import path from 'node:path'
 import fs from 'node:fs'
+import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -19,7 +20,28 @@ const electronBin =
     ? path.join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
     : path.join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron')
 
+// A previous run of this exact script left zombie electron.exe processes
+// behind (a launch that errors/times out doesn't always get cleaned up by
+// Playwright), which then squatted on port 43117 and made the NEXT launch
+// fail too, silently (see the Phase 4 iteration log). Best-effort cleanup
+// before every run so that failure mode can't compound across runs.
+function killStaleInstances() {
+  if (process.platform !== 'win32') return
+  try {
+    execSync(
+      'powershell -NoProfile -Command "Get-Process node,electron -ErrorAction SilentlyContinue | ' +
+        "Where-Object { $_.Path -like '*MarbleGrid*04 System*' } | " +
+        'Stop-Process -Force -ErrorAction SilentlyContinue"',
+      { stdio: 'ignore' }
+    )
+  } catch {
+    // Best-effort — a failed cleanup attempt shouldn't block the actual run.
+  }
+}
+
 async function main() {
+  killStaleInstances()
+  await new Promise((r) => setTimeout(r, 1000))
   console.log('Launching', electronBin, 'against', APP_DIR)
   const app = await electron.launch({
     executablePath: electronBin,
@@ -27,6 +49,17 @@ async function main() {
     timeout: 30_000
   })
 
+  try {
+    await takeShots(app)
+  } finally {
+    // Always close, even on failure mid-script — an uncaught exception
+    // between launch and here is exactly how last time's zombies happened.
+    await app.close().catch(() => {})
+  }
+  console.log('done')
+}
+
+async function takeShots(app) {
   // Electron has no clean "ready" signal from the outside — wait for the
   // first real (non-devtools) window, then a beat for React to paint.
   let page = await app.firstWindow()
@@ -64,8 +97,24 @@ async function main() {
     console.log('WARNING: could not find Leaderboard nav button to click')
   }
 
-  await app.close()
-  console.log('done')
+  // Phase 4: the overlay is a plain HTTP page now (that's the whole point —
+  // OBS needs a URL), so navigate the same window to it directly rather than
+  // needing a second Electron window. Inject a fake "gameplay" backdrop
+  // first so transparency/legibility can actually be judged — a raw
+  // transparent PNG is hard to eyeball meaningfully on its own.
+  await page.goto('http://127.0.0.1:43117/overlay')
+  await page.waitForTimeout(1500)
+  await page.evaluate(() => {
+    const backdrop = document.createElement('div')
+    backdrop.style.position = 'fixed'
+    backdrop.style.inset = '0'
+    backdrop.style.zIndex = '-1'
+    backdrop.style.background = 'linear-gradient(135deg, #2b5876, #4e4376 40%, #1f4037 70%, #99f2c8)'
+    document.body.prepend(backdrop)
+  })
+  const overlayShot = path.join(OUT_DIR, '03-overlay-simulated.png')
+  await page.screenshot({ path: overlayShot })
+  console.log('screenshot:', overlayShot)
 }
 
 main().catch((err) => {

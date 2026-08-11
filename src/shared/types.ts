@@ -130,3 +130,13 @@ export interface LeaderboardRow {
   wins: number
   totalPoints: number
 }
+
+/** Normalized "most recent thing that happened" across Race/Tilt/Royale — powers the overlay's result toast. */
+export interface LatestEventSummary {
+  kind: 'race' | 'tilt' | 'royale'
+  occurredAt: string
+  label: string
+  winnerName: string
+  winnerPoints: number
+  topFinishers: { name: string; points: number }[]
+}
