@@ -4,6 +4,7 @@ import { startServer } from './backend/server.ts'
 import { initDb } from './backend/db/db.ts'
 import { startWatcher } from './backend/watcher/fileWatcher.ts'
 import { reconcileSeasonsAtStartup } from './backend/watcher/seasonDetector.ts'
+import { initSettingsStore } from './backend/twitch/settingsStore.ts'
 import { SERVER_PORT } from '../shared/constants.ts'
 
 let mainWindow: BrowserWindow | null = null
@@ -94,6 +95,7 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     try {
       initDb(join(app.getPath('userData'), 'marblegrid.db'))
+      initSettingsStore(join(app.getPath('userData'), 'twitch-settings.json'))
       reconcileSeasonsAtStartup()
       startWatcher()
       await startServer(SERVER_PORT)

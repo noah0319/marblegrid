@@ -140,3 +140,10 @@ export interface LatestEventSummary {
   winnerPoints: number
   topFinishers: { name: string; points: number }[]
 }
+
+export interface TwitchStatus {
+  hasCredentials: boolean
+  connected: boolean
+  login: string | null
+  autoPostEnabled: boolean
+}

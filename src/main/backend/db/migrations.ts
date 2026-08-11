@@ -145,5 +145,28 @@ CREATE INDEX IF NOT EXISTS idx_race_participants_racer ON race_participants(race
 CREATE INDEX IF NOT EXISTS idx_tilt_participants_racer ON tilt_participants(racer_id);
 CREATE INDEX IF NOT EXISTS idx_royale_participants_racer ON royale_participants(racer_id);
 `
+  },
+  {
+    // 001's chat_post_log only keyed on race_event_id, but Phase 5 posts for
+    // Race/Tilt/Royale alike. Never had real rows written (Phase 5 didn't
+    // exist yet), so a clean drop-and-recreate is safe — no data migration
+    // needed. Keyed on (event_kind, event_occurred_at) to match
+    // getLatestEvent()'s existing normalized shape rather than inventing a
+    // second identity scheme.
+    id: '002_chat_post_log_rework',
+    sql: `
+DROP TABLE IF EXISTS chat_post_log;
+
+CREATE TABLE chat_post_log (
+  id INTEGER PRIMARY KEY,
+  event_kind TEXT NOT NULL,
+  event_occurred_at TEXT NOT NULL,
+  attempted_at TEXT NOT NULL,
+  success INTEGER NOT NULL,
+  message TEXT,
+  error TEXT,
+  UNIQUE(event_kind, event_occurred_at)
+);
+`
   }
 ]

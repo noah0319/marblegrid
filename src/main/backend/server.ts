@@ -1,6 +1,7 @@
 import express from 'express'
 import { createServer } from 'http'
 import { join } from 'path'
+import { shell } from 'electron'
 import { WebSocketServer } from 'ws'
 import { registerWss } from './ws.ts'
 import { getDb } from './db/db.ts'
@@ -9,6 +10,10 @@ import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
 import { getLeaderboard } from './db/queries/leaderboard.ts'
 import { getLatestEvent } from './db/queries/latestEvent.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
+import { getSettings, updateSettings } from './twitch/settingsStore.ts'
+import { getAuthorizeUrl, handleOAuthCallback, isConnected, disconnect } from './twitch/auth.ts'
+import { sendTestPost } from './twitch/chatPoster.ts'
+import type { TwitchStatus } from '../../shared/types.ts'
 
 /**
  * Local-only Express + WebSocket server. Binds to 127.0.0.1 only — this is a
@@ -27,7 +32,7 @@ export async function startServer(port: number): Promise<void> {
   })
 
   app.get('/api/status', (_req, res) => {
-    res.json({ status: 'OK', app: 'MarbleGrid', phase: 3 })
+    res.json({ status: 'OK', app: 'MarbleGrid', phase: 5 })
   })
 
   // Real stats routes — Phase 2. Day-boundary hour is a hardcoded default for
@@ -44,6 +49,85 @@ export async function startServer(port: number): Promise<void> {
   })
   app.get('/api/latest-event', (_req, res) => {
     res.json(getLatestEvent())
+  })
+
+  // Phase 5 — Twitch connection + chat posting. Client Secret is write-only
+  // from the renderer's perspective: /api/twitch/status never echoes it
+  // back, only whether credentials exist at all.
+  app.get('/api/twitch/status', (_req, res) => {
+    const settings = getSettings()
+    const status: TwitchStatus = {
+      hasCredentials: Boolean(settings.clientId && settings.clientSecret),
+      connected: isConnected(),
+      login: settings.login,
+      autoPostEnabled: settings.autoPostEnabled
+    }
+    res.json(status)
+  })
+
+  app.post('/api/twitch/credentials', (req, res) => {
+    const { clientId, clientSecret } = req.body as { clientId?: string; clientSecret?: string }
+    if (!clientId || !clientSecret) {
+      res.status(400).json({ error: 'clientId and clientSecret are both required' })
+      return
+    }
+    updateSettings({ clientId, clientSecret })
+    res.json({ ok: true })
+  })
+
+  app.post('/api/twitch/connect', (_req, res) => {
+    try {
+      const url = getAuthorizeUrl()
+      void shell.openExternal(url)
+      res.json({ ok: true })
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  app.post('/api/twitch/disconnect', (_req, res) => {
+    disconnect()
+    res.json({ ok: true })
+  })
+
+  app.post('/api/twitch/auto-post', (req, res) => {
+    const { enabled } = req.body as { enabled?: boolean }
+    updateSettings({ autoPostEnabled: Boolean(enabled) })
+    res.json({ ok: true })
+  })
+
+  app.post('/api/twitch/test-post', (_req, res) => {
+    sendTestPost()
+      .then((result) => res.json(result))
+      .catch((err: unknown) => {
+        res.status(500).json({ attempted: true, success: false, error: err instanceof Error ? err.message : String(err) })
+      })
+  })
+
+  // Twitch redirects here after Noah authorizes (or declines) on Twitch's
+  // own site — see 02 Twitch Integration for the human-facing walkthrough.
+  app.get('/oauth/callback', (req, res) => {
+    const { code, error, error_description: errorDescription } = req.query as {
+      code?: string
+      error?: string
+      error_description?: string
+    }
+
+    if (error) {
+      res.status(400).send(oauthResultPage(false, errorDescription ?? error))
+      return
+    }
+    if (!code) {
+      res.status(400).send(oauthResultPage(false, 'No authorization code was returned by Twitch.'))
+      return
+    }
+
+    handleOAuthCallback(code)
+      .then(({ login }) => res.send(oauthResultPage(true, `Connected as ${login}.`)))
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err)
+        res.status(500).send(oauthResultPage(false, message))
+      })
   })
 
   // Phase 1 debug routes — let us (and Noah) see raw ingested events without
@@ -91,4 +175,30 @@ export async function startServer(port: number): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.log(`MarbleGrid backend listening on http://127.0.0.1:${port}`)
+}
+
+/** Plain, dependency-free HTML for the one-off tab Twitch's redirect lands on — dark theme to match, no build step needed for a single static page. */
+function oauthResultPage(success: boolean, detail: string): string {
+  const color = success ? '#7dfe9c' : '#ff6b6b'
+  const heading = success ? 'Connected!' : 'Connection failed'
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>MarbleGrid — Twitch</title>
+<style>
+  body { background: #0a0a0f; color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  .card { background: #13131c; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+          padding: 32px 40px; max-width: 420px; text-align: center; }
+  h1 { color: ${color}; font-size: 22px; margin: 0 0 12px; }
+  p { color: #a3a3b8; font-size: 14px; line-height: 1.5; margin: 0; }
+</style></head>
+<body><div class="card"><h1>${heading}</h1><p>${escapeHtml(detail)}</p>
+<p style="margin-top:16px;">You can close this tab and return to MarbleGrid.</p></div></body></html>`
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }

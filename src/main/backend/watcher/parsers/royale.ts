@@ -8,6 +8,8 @@ import { getOpenSeasonId } from '../../db/queries/seasons.ts'
 import { RoyaleParticipantSchema } from '../../../../shared/types.ts'
 import { MARBLES_SAVE_DIR } from '../paths.ts'
 import { broadcast } from '../../ws.ts'
+import { getLatestEvent } from '../../db/queries/latestEvent.ts'
+import { maybePostEventToChat } from '../../twitch/chatPoster.ts'
 
 export async function ingestRoyaleFile(dir: string = MARBLES_SAVE_DIR): Promise<number | null> {
   const text = await readFile(join(dir, 'LastSeasonRoyale.csv'), 'utf-8')
@@ -69,5 +71,9 @@ export function ingestRoyaleFromText(text: string): number | null {
   }
 
   broadcast({ type: 'royale-event', contentHash })
+
+  const latest = getLatestEvent()
+  if (latest) void maybePostEventToChat(latest)
+
   return royaleEventId
 }

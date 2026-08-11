@@ -97,6 +97,32 @@ async function takeShots(app) {
     console.log('WARNING: could not find Leaderboard nav button to click')
   }
 
+  // Phase 5: Settings now has real Twitch-connect controls. Confirm the
+  // status API returns sane defaults (nothing connected, auto-post off)
+  // before screenshotting so a rendering bug and a bad default can't be
+  // confused for each other.
+  const twitchStatus = await page.evaluate(async () => {
+    const res = await fetch('http://127.0.0.1:43117/api/twitch/status')
+    return { ok: res.ok, body: await res.json() }
+  })
+  console.log('twitch status:', JSON.stringify(twitchStatus))
+
+  const clickedSettings = await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('button')]
+    const btn = buttons.find((b) => b.textContent?.trim() === 'Settings')
+    if (!btn) return false
+    btn.click()
+    return true
+  })
+  if (clickedSettings) {
+    await page.waitForTimeout(800)
+    const settingsShot = path.join(OUT_DIR, '02b-settings.png')
+    await page.screenshot({ path: settingsShot })
+    console.log('screenshot:', settingsShot)
+  } else {
+    console.log('WARNING: could not find Settings nav button to click')
+  }
+
   // Phase 4: the overlay is a plain HTTP page now (that's the whole point —
   // OBS needs a URL), so navigate the same window to it directly rather than
   // needing a second Electron window. Inject a fake "gameplay" backdrop

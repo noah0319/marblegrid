@@ -7,6 +7,8 @@ import { getOpenSeasonId } from '../../db/queries/seasons.ts'
 import { TiltLevelSchema, TiltParticipantSchema } from '../../../../shared/types.ts'
 import { MARBLES_SAVE_DIR } from '../paths.ts'
 import { broadcast } from '../../ws.ts'
+import { getLatestEvent } from '../../db/queries/latestEvent.ts'
+import { maybePostEventToChat } from '../../twitch/chatPoster.ts'
 
 export async function ingestTiltFiles(dir: string = MARBLES_SAVE_DIR): Promise<number | null> {
   const [levelText, playersText] = await Promise.all([
@@ -111,5 +113,9 @@ export function ingestTiltFromText(levelText: string, playersText: string): numb
   }
 
   broadcast({ type: 'tilt-event', snapshotId: level.SnapshotId })
+
+  const latest = getLatestEvent()
+  if (latest) void maybePostEventToChat(latest)
+
   return tiltEventId
 }

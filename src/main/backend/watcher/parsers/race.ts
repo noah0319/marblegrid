@@ -7,6 +7,8 @@ import { getOpenSeasonId } from '../../db/queries/seasons.ts'
 import { RaceSummarySchema, RaceParticipantSchema } from '../../../../shared/types.ts'
 import { MARBLES_SAVE_DIR } from '../paths.ts'
 import { broadcast } from '../../ws.ts'
+import { getLatestEvent } from '../../db/queries/latestEvent.ts'
+import { maybePostEventToChat } from '../../twitch/chatPoster.ts'
 
 export async function ingestRaceFiles(dir: string = MARBLES_SAVE_DIR): Promise<number | null> {
   const [summaryText, participantsText] = await Promise.all([
@@ -133,5 +135,13 @@ export function ingestRaceFromText(summaryText: string, participantsText: string
   }
 
   broadcast({ type: 'race-event', snapshotId: summary.SnapshotId })
+
+  // Fire-and-forget: chatPoster does nothing unless auto-post is explicitly
+  // enabled (off by default), and any failure is caught + logged inside it —
+  // a slow/failed chat post must never block the file watcher from
+  // processing the next event.
+  const latest = getLatestEvent()
+  if (latest) void maybePostEventToChat(latest)
+
   return raceEventId
 }
