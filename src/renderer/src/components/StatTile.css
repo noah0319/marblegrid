@@ -1,0 +1,33 @@
+.stat-tile {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stat-tile__label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.stat-tile__value {
+  /* Proportional figures, not tabular-nums — this is a standalone headline
+     value, not a column that needs to align with neighbors (marks-and-anatomy.md). */
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+  font-variant-numeric: proportional-nums;
+}
+
+.stat-tile--accent .stat-tile__value {
+  color: var(--accent-primary);
+  text-shadow: 0 0 18px var(--accent-primary-glow);
+}

@@ -1,13 +1,6 @@
 import { getDb } from '../db.ts'
 import { getTodayBoundaryRangeUtc } from '../../../../shared/dayBoundary.ts'
-
-export interface RaceStats {
-  totalPoints: number
-  totalCount: number
-  avgPoints: number
-  raceHs: number
-  brHs: number
-}
+import type { RaceStats } from '../../../../shared/types.ts'
 
 interface RaceAggregateRow {
   total_count: number

@@ -1,12 +1,5 @@
 import { getDb } from '../db.ts'
-
-export interface LeaderboardRow {
-  username: string
-  displayName: string
-  racesPlayed: number
-  wins: number
-  totalPoints: number
-}
+import type { LeaderboardRow } from '../../../../shared/types.ts'
 
 /**
  * "Regulars" leaderboard for the streamer's own channel — races played, wins,

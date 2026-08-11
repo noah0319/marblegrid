@@ -1,0 +1,98 @@
+.leaderboard {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.leaderboard__table {
+  width: 100%;
+  border-collapse: collapse;
+  /* Table column of numbers -> tabular-nums so digits align vertically
+     (marks-and-anatomy.md); stat-tile headline values deliberately don't. */
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard__table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-hairline);
+  white-space: nowrap;
+}
+
+.leaderboard__table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.leaderboard__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.leaderboard__table tbody tr:hover td {
+  background: var(--surface-card-hover);
+}
+
+.leaderboard__rank-col {
+  width: 40px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.leaderboard__rank--gold {
+  color: var(--rank-gold);
+  text-shadow: 0 0 10px rgba(232, 195, 74, 0.5);
+}
+
+.leaderboard__rank--silver {
+  color: var(--rank-silver);
+}
+
+.leaderboard__rank--bronze {
+  color: var(--rank-bronze);
+}
+
+.leaderboard__name {
+  font-weight: 600;
+}
+
+.leaderboard__num {
+  color: var(--text-secondary);
+}
+
+.leaderboard__num--points {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.leaderboard__sort {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.leaderboard__sort:hover {
+  color: var(--text-primary);
+}
+
+.leaderboard__sort--active {
+  color: var(--accent-primary);
+}
+
+.leaderboard__empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 32px 16px;
+}

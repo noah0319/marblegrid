@@ -8,3 +8,4 @@ dist/
 out/
 build/
 *.log
+tools/shots/

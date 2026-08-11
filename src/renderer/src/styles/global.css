@@ -1,0 +1,32 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: proportional-nums;
+}
+
+::selection {
+  background: var(--accent-primary-glow);
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}

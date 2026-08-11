@@ -1,0 +1,68 @@
+/*
+ * Design tokens — dark gaming HUD / neon direction (Noah's stated visual
+ * direction, decision #7 in the implementation plan).
+ *
+ * Colors are NOT eyeballed. The categorical hues below are the dataviz
+ * skill's validated default palette (dark-mode steps), re-purposed for this
+ * UI's actual needs rather than a literal multi-series legend:
+ *   - --accent-primary reuses slot 7 (violet) as the single brand/headline
+ *     accent — already validated, reads as "neon purple HUD."
+ *   - --mode-race/tilt/royale reuse slots 1-3 (blue/orange/aqua) as game-mode
+ *     identity badges — validated all-pairs-safe together (see palette.md:
+ *     "the first three slots validate all-pairs in both modes").
+ *   - --status-* are the skill's fixed status scale, used as-is (status is
+ *     never themed — color-formula.md).
+ * All of the above were re-validated against THIS file's custom surface
+ * (#0a0a0f, darker than the skill's default #1a1a19) via
+ * scripts/validate_palette.js before being adopted — see the Phase 3
+ * iteration log for the actual runs. Since contrast only improves as the
+ * surface gets darker (WCAG ratio is monotonic in surface luminance), a
+ * darker custom surface than the validated default carries the passing
+ * result forward, not just by assumption.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --surface-page: #0a0a0f;
+  --surface-card: #13131c;
+  --surface-card-hover: #191927;
+  --surface-card-active: #1e1e30;
+
+  /* Borders */
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --border-hairline-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #a3a3b8;
+  --text-muted: #6b6b80;
+
+  /* Brand / primary accent (validated categorical slot 7, dark) */
+  --accent-primary: #9085e9;
+  --accent-primary-glow: rgba(144, 133, 233, 0.5);
+
+  /* Game-mode identity (validated categorical slots 1-3, dark, all-pairs-safe) */
+  --mode-race: #3987e5;
+  --mode-tilt: #d95926;
+  --mode-royale: #199e70;
+
+  /* Status — fixed scale, never themed (color-formula.md) */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  /* Leaderboard rank accents — decorative positional convention, not data encoding */
+  --rank-gold: #e8c34a;
+  --rank-silver: #c7c9d1;
+  --rank-bronze: #cd8a4f;
+
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}

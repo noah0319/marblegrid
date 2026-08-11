@@ -25,7 +25,7 @@ export async function startServer(port: number): Promise<void> {
   })
 
   app.get('/api/status', (_req, res) => {
-    res.json({ status: 'OK', app: 'MarbleGrid', phase: 2 })
+    res.json({ status: 'OK', app: 'MarbleGrid', phase: 3 })
   })
 
   // Real stats routes — Phase 2. Day-boundary hour is a hardcoded default for

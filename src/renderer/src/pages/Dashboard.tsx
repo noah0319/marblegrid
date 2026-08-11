@@ -1,0 +1,53 @@
+import { useState } from 'react'
+import StatTile from '../components/StatTile'
+import { useStats } from '../hooks/useStats'
+import { formatCompactNumber, formatFullNumber } from '@shared/format'
+import './Dashboard.css'
+
+type Scope = 'season' | 'today'
+
+export default function Dashboard(): React.JSX.Element {
+  const { season, today, loading } = useStats()
+  const [scope, setScope] = useState<Scope>('season')
+
+  const stats = scope === 'season' ? season : today
+
+  return (
+    <div>
+      <div className="dashboard__header">
+        <h1 className="dashboard__title">Dashboard</h1>
+        <div className="dashboard__scope-toggle" role="tablist" aria-label="Stats period">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={scope === 'season'}
+            className={`dashboard__scope-btn${scope === 'season' ? ' dashboard__scope-btn--active' : ''}`}
+            onClick={() => setScope('season')}
+          >
+            Season
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={scope === 'today'}
+            className={`dashboard__scope-btn${scope === 'today' ? ' dashboard__scope-btn--active' : ''}`}
+            onClick={() => setScope('today')}
+          >
+            Today
+          </button>
+        </div>
+      </div>
+
+      {loading || !stats ? (
+        <div className="dashboard__loading">Loading stats…</div>
+      ) : (
+        <div className="dashboard__grid">
+          <StatTile label="Total Points" value={formatCompactNumber(stats.totalPoints)} accent />
+          <StatTile label="Avg Points" value={formatFullNumber(stats.avgPoints)} />
+          <StatTile label="Race HS" value={formatFullNumber(stats.raceHs)} />
+          <StatTile label="BR HS" value={formatFullNumber(stats.brHs)} />
+        </div>
+      )}
+    </div>
+  )
+}

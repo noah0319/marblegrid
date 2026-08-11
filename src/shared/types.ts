@@ -111,3 +111,22 @@ export type WsMessage =
   | { type: 'race-event'; snapshotId: string }
   | { type: 'tilt-event'; snapshotId: string }
   | { type: 'royale-event'; contentHash: string }
+
+// --- API response shapes — single source of truth for backend (Phase 2) and
+// renderer/overlay (Phase 3/4), so the two never quietly drift apart. ---
+
+export interface RaceStats {
+  totalPoints: number
+  totalCount: number
+  avgPoints: number
+  raceHs: number
+  brHs: number
+}
+
+export interface LeaderboardRow {
+  username: string
+  displayName: string
+  racesPlayed: number
+  wins: number
+  totalPoints: number
+}
