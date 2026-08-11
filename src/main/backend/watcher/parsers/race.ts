@@ -1,0 +1,126 @@
+import { readFile } from 'fs/promises'
+import { join } from 'path'
+import { parse } from 'csv-parse/sync'
+import { getDb } from '../../db/db.ts'
+import { upsertRacer } from '../../db/queries/racers.ts'
+import { getOpenSeasonId } from '../../db/queries/seasons.ts'
+import { RaceSummarySchema, RaceParticipantSchema } from '../../../../shared/types.ts'
+import { MARBLES_SAVE_DIR } from '../paths.ts'
+import { broadcast } from '../../ws.ts'
+
+export async function ingestRaceFiles(dir: string = MARBLES_SAVE_DIR): Promise<number | null> {
+  const [summaryText, participantsText] = await Promise.all([
+    readFile(join(dir, 'LastSeasonRaceSummary.csv'), 'utf-8'),
+    readFile(join(dir, 'LastSeasonRace.csv'), 'utf-8')
+  ])
+  return ingestRaceFromText(summaryText, participantsText)
+}
+
+/**
+ * Pure text-in version, used directly by tests and by the file-reading
+ * wrapper above. Re-reads (parses) BOTH the summary and participants text
+ * every time regardless of which file actually changed on disk — this makes
+ * ingestion idempotent and order-independent instead of timing-dependent,
+ * since there's no guarantee which of the two files' chokidar events fires
+ * first.
+ */
+export function ingestRaceFromText(summaryText: string, participantsText: string): number | null {
+  const summaryRows = parse(summaryText, {
+    columns: true,
+    trim: true,
+    skip_empty_lines: true
+  }) as Record<string, string>[]
+  const participantRows = parse(participantsText, {
+    columns: true,
+    trim: true,
+    skip_empty_lines: true
+  }) as Record<string, string>[]
+
+  if (summaryRows.length === 0) return null
+  const summary = RaceSummarySchema.parse(summaryRows[0])
+
+  const participants = participantRows
+    .filter((r) => r.SnapshotId === summary.SnapshotId)
+    .map((r) => RaceParticipantSchema.parse(r))
+
+  // The two files haven't both caught up to the same SnapshotId yet (one's
+  // write finished before the other's) — safe to skip. The other file's own
+  // change event will re-trigger this and catch it once both agree.
+  if (participants.length === 0) return null
+
+  const db = getDb()
+  const already = db.prepare('SELECT id FROM race_events WHERE snapshot_id = ?').get(summary.SnapshotId) as
+    | { id: number }
+    | undefined
+  if (already) return already.id
+
+  const seasonId = getOpenSeasonId()
+  let raceEventId: number
+
+  db.exec('BEGIN')
+  try {
+    const insertResult = db
+      .prepare(
+        `INSERT INTO race_events (
+          snapshot_id, schema_version, generated_at_utc, captured_at_local,
+          status, game_mode, session_type, map_name, map_creator,
+          player_count, finished_count, eliminated_count,
+          winner_platform, winner_username, season_id, raw_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        summary.SnapshotId,
+        summary.SchemaVersion,
+        summary.GeneratedAtUtc,
+        new Date().toISOString(),
+        summary.Status,
+        summary.GameMode,
+        summary.SessionType,
+        summary.MapName,
+        summary.MapCreator,
+        summary.PlayerCount,
+        summary.FinishedCount,
+        summary.EliminatedCount,
+        summary.WinnerPlatform,
+        summary.WinnerUsername,
+        seasonId,
+        JSON.stringify({ summary, participants })
+      )
+
+    raceEventId = insertResult.lastInsertRowid as number
+
+    for (const p of participants) {
+      const racerId = upsertRacer(db, {
+        username: p.Username,
+        displayName: p.DisplayName,
+        platform: p.Platform,
+        nameColorHex: p.NameColorHex
+      })
+
+      db.prepare(
+        `INSERT INTO race_participants (
+          race_event_id, racer_id, position, season_points_earned, season_points_total,
+          season_wins_total, season_matches_played_total, time_in_race_seconds, eliminated
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        raceEventId,
+        racerId,
+        p.Position,
+        p.SeasonPointsEarned,
+        p.SeasonPointsTotal,
+        p.SeasonWinsTotal,
+        p.SeasonMatchesPlayedTotal,
+        p.TimeInRaceSeconds,
+        p.Eliminated ? 1 : 0
+      )
+    }
+
+    db.exec('COMMIT')
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+
+  broadcast({ type: 'race-event', snapshotId: summary.SnapshotId })
+  return raceEventId
+}

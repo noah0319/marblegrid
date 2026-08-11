@@ -1,7 +1,10 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
-import { startServer } from './backend/server'
-import { SERVER_PORT } from '../shared/constants'
+import { startServer } from './backend/server.ts'
+import { initDb } from './backend/db/db.ts'
+import { startWatcher } from './backend/watcher/fileWatcher.ts'
+import { reconcileSeasonsAtStartup } from './backend/watcher/seasonDetector.ts'
+import { SERVER_PORT } from '../shared/constants.ts'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -64,11 +67,13 @@ function createTray(): void {
 
 // Do NOT quit when every window is closed — the backend (watcher, db, chat
 // poster) needs to keep running for the whole stream regardless of whether
-// the companion window is open. This is the single most important lifecycle
-// decision in the app; see the implementation plan's Architecture section.
+// the companion window is open.
 app.on('window-all-closed', () => {})
 
 app.whenReady().then(async () => {
+  initDb(join(app.getPath('userData'), 'marblegrid.db'))
+  reconcileSeasonsAtStartup()
+  startWatcher()
   await startServer(SERVER_PORT)
   createWindow()
   createTray()

@@ -1,0 +1,2 @@
+SchemaVersion,SnapshotId,GeneratedAtUtc,Status,GameMode,SessionType,Level,Difficulty,LevelDurationSeconds,LevelPassed,PlayerCount,FinishedCount,EliminatedCount,TopTilteePlatform,TopTilteeUsername,StandardPointsPerFinisher,ExpertiseEarned,TotalExpertise,LiveStreamActive
+4,ab11ebcf-42aa-0392-f233-8da795f1205a,2026-08-08T01:02:25.643Z,Final,Tilted,Online,13,5,70.495918,false,8,0,8,Twitch,lunchbox701,0,0,103,true
