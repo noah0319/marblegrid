@@ -3,6 +3,10 @@ import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
 import { registerWss } from './ws.ts'
 import { getDb } from './db/db.ts'
+import { getOpenSeasonId } from './db/queries/seasons.ts'
+import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
+import { getLeaderboard } from './db/queries/leaderboard.ts'
+import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 
 /**
  * Local-only Express + WebSocket server. Binds to 127.0.0.1 only — this is a
@@ -21,7 +25,20 @@ export async function startServer(port: number): Promise<void> {
   })
 
   app.get('/api/status', (_req, res) => {
-    res.json({ status: 'OK', app: 'MarbleGrid', phase: 1 })
+    res.json({ status: 'OK', app: 'MarbleGrid', phase: 2 })
+  })
+
+  // Real stats routes — Phase 2. Day-boundary hour is a hardcoded default for
+  // now; Phase 3's Settings screen makes it a real per-user override.
+  app.get('/api/stats/season', (_req, res) => {
+    res.json(getSeasonStats(getOpenSeasonId()))
+  })
+  app.get('/api/stats/today', (_req, res) => {
+    res.json(getTodayStats(DEFAULT_DAY_BOUNDARY_HOUR))
+  })
+  app.get('/api/leaderboard', (req, res) => {
+    const limit = Number(req.query['limit']) || 20
+    res.json(getLeaderboard(getOpenSeasonId(), limit))
   })
 
   // Phase 1 debug routes — let us (and Noah) see raw ingested events without
