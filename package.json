@@ -10,7 +10,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "node --experimental-strip-types --test tests/race-ingest.test.ts tests/day-boundary.test.ts tests/stats.test.ts tests/latest-event.test.ts tests/chat-poster.test.ts",
+    "test": "node --experimental-strip-types --test tests/race-ingest.test.ts tests/day-boundary.test.ts tests/stats.test.ts tests/latest-event.test.ts tests/chat-poster.test.ts tests/map-records.test.ts",
     "screenshot": "node tools/screenshot.mjs"
   },
   "dependencies": {

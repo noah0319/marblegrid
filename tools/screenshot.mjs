@@ -97,6 +97,23 @@ async function takeShots(app) {
     console.log('WARNING: could not find Leaderboard nav button to click')
   }
 
+  // Map Records: click into the new nav item and screenshot it too.
+  const clickedRecords = await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll('button')]
+    const btn = buttons.find((b) => b.textContent?.trim() === 'Map Records')
+    if (!btn) return false
+    btn.click()
+    return true
+  })
+  if (clickedRecords) {
+    await page.waitForTimeout(800)
+    const recordsShot = path.join(OUT_DIR, '02c-records.png')
+    await page.screenshot({ path: recordsShot })
+    console.log('screenshot:', recordsShot)
+  } else {
+    console.log('WARNING: could not find Map Records nav button to click')
+  }
+
   // Phase 5: Settings now has real Twitch-connect controls. Confirm the
   // status API returns sane defaults (nothing connected, auto-post off)
   // before screenshotting so a rendering bug and a bad default can't be

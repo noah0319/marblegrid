@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import './Layout.css'
 
-export type Page = 'dashboard' | 'leaderboard' | 'settings'
+export type Page = 'dashboard' | 'leaderboard' | 'records' | 'settings'
 
 interface LayoutProps {
   page: Page
@@ -12,6 +12,7 @@ interface LayoutProps {
 const NAV_ITEMS: { id: Page; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'leaderboard', label: 'Leaderboard' },
+  { id: 'records', label: 'Map Records' },
   { id: 'settings', label: 'Settings' }
 ]
 

@@ -8,6 +8,7 @@ import { getDb } from './db/db.ts'
 import { getOpenSeasonId } from './db/queries/seasons.ts'
 import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
 import { getLeaderboard } from './db/queries/leaderboard.ts'
+import { getMapRecords } from './db/queries/mapRecords.ts'
 import { getLatestEvent } from './db/queries/latestEvent.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 import { getSettings, updateSettings } from './twitch/settingsStore.ts'
@@ -68,6 +69,12 @@ export async function startServer(port: number): Promise<void> {
   app.get('/api/leaderboard', (req, res) => {
     const limit = Number(req.query['limit']) || 20
     res.json(getLeaderboard(getOpenSeasonId(), limit))
+  })
+  // All-time, not season-scoped — a map record is about the map, not a
+  // season's standings. Personal-to-Noah feature (his ask, not part of the
+  // multi-streamer-friendly config surface).
+  app.get('/api/map-records', (_req, res) => {
+    res.json(getMapRecords())
   })
   app.get('/api/latest-event', (_req, res) => {
     res.json(getLatestEvent())
