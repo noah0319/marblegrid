@@ -108,3 +108,22 @@ test("records are tracked per map — a race on a different map does not affect 
   assert.equal(different?.racerName, 'OtherMapRacer')
   assert.equal(different?.timeSeconds, 45)
 })
+
+test('the same map reported with different capitalization across two plays is still ONE record, not two', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // "feel the fire", 133.391144s
+
+  // This game has a confirmed real pattern of inconsistent capitalization
+  // elsewhere (season .sav filenames) — simulating the same risk here.
+  const recapped = syntheticRace({
+    snapshotId: '44444444-4444-4444-4444-444444444444',
+    mapName: 'Feel The Fire',
+    winnerTime: 100,
+    winnerName: 'FasterRacer'
+  })
+  ingestRaceFromText(recapped.summary, recapped.participants)
+
+  const records = getMapRecords()
+  assert.equal(records.length, 1, 'a differently-capitalized replay of the same map must not create a second row')
+  assert.equal(records[0]?.racerName, 'FasterRacer') // 100s genuinely beats 133.39s
+  assert.equal(records[0]?.timeSeconds, 100)
+})

@@ -4,6 +4,9 @@ import type { MapRecord } from '../../../../shared/types.ts'
 /**
  * Best (lowest) finish time ever captured per map, all-time — not scoped to
  * a season, since a map record is about the map, not a season's standings.
+ * Playing the same map again never adds a second row: it either beats the
+ * existing record (replaces it) or doesn't (existing record stands) — never
+ * both showing at once. Verified both directions in map-records.test.ts.
  *
  * eliminated = 0 is not optional: a participant who got knocked out early
  * has a LOW time_in_race_seconds too (how long they survived, not how long
@@ -13,6 +16,12 @@ import type { MapRecord } from '../../../../shared/types.ts'
  * that map took 133s. Position/points are consistent with time only among
  * actual finishers (also confirmed against the real sample), so this only
  * ever needs to compare within that group.
+ *
+ * Map-name comparisons are COLLATE NOCASE throughout: this game has a
+ * confirmed real pattern of inconsistent capitalization elsewhere (season
+ * .sav filenames — "season 55.sav" vs "Season 63.sav"), so if the same map
+ * ever gets reported with different casing across two plays, it must still
+ * be treated as one map, not silently split into two records.
  */
 export function getMapRecords(): MapRecord[] {
   const db = getDb()
@@ -33,9 +42,9 @@ export function getMapRecords(): MapRecord[] {
            SELECT MIN(rp2.time_in_race_seconds)
            FROM race_participants rp2
            JOIN race_events re2 ON re2.id = rp2.race_event_id
-           WHERE re2.map_name = re.map_name AND rp2.eliminated = 0
+           WHERE re2.map_name = re.map_name COLLATE NOCASE AND rp2.eliminated = 0
          )
-       GROUP BY re.map_name
+       GROUP BY re.map_name COLLATE NOCASE
        ORDER BY re.map_name COLLATE NOCASE`
     )
     .all() as unknown as MapRecord[]

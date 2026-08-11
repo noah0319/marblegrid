@@ -12,7 +12,7 @@ interface LayoutProps {
 const NAV_ITEMS: { id: Page; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'leaderboard', label: 'Leaderboard' },
-  { id: 'records', label: 'Map Records' },
+  { id: 'records', label: 'Ghost Balls' },
   { id: 'settings', label: 'Settings' }
 ]
 

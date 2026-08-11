@@ -1,3 +1,22 @@
+.map-records__search {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 16px;
+  background: var(--surface-page);
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.map-records__search:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
 .map-records {
   background: var(--surface-card);
   border: 1px solid var(--border-hairline);

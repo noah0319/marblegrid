@@ -97,10 +97,11 @@ async function takeShots(app) {
     console.log('WARNING: could not find Leaderboard nav button to click')
   }
 
-  // Map Records: click into the new nav item and screenshot it too.
+  // Ghost Balls (map records, renamed per Noah's request): click into the
+  // nav item and screenshot it too.
   const clickedRecords = await page.evaluate(() => {
     const buttons = [...document.querySelectorAll('button')]
-    const btn = buttons.find((b) => b.textContent?.trim() === 'Map Records')
+    const btn = buttons.find((b) => b.textContent?.trim() === 'Ghost Balls')
     if (!btn) return false
     btn.click()
     return true
@@ -111,7 +112,7 @@ async function takeShots(app) {
     await page.screenshot({ path: recordsShot })
     console.log('screenshot:', recordsShot)
   } else {
-    console.log('WARNING: could not find Map Records nav button to click')
+    console.log('WARNING: could not find Ghost Balls nav button to click')
   }
 
   // Phase 5: Settings now has real Twitch-connect controls. Confirm the
