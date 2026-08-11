@@ -10,12 +10,13 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "node --experimental-strip-types --test tests/race-ingest.test.ts tests/day-boundary.test.ts tests/stats.test.ts tests/latest-event.test.ts tests/chat-poster.test.ts tests/map-records.test.ts",
+    "test": "node --experimental-strip-types --test tests/race-ingest.test.ts tests/day-boundary.test.ts tests/stats.test.ts tests/latest-event.test.ts tests/chat-poster.test.ts tests/map-records.test.ts tests/chat-commands.test.ts",
     "screenshot": "node tools/screenshot.mjs"
   },
   "dependencies": {
     "@twurple/api": "^8.1.4",
     "@twurple/auth": "^8.1.4",
+    "@twurple/eventsub-ws": "^8.1.4",
     "chokidar": "^5.0.0",
     "csv-parse": "^7.0.2",
     "express": "^5.2.1",

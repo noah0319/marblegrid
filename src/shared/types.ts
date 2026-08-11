@@ -157,4 +157,6 @@ export interface TwitchStatus {
   connected: boolean
   login: string | null
   autoPostEnabled: boolean
+  /** Whether the chat-commands listener (!mystats etc.) is actually running — false if never started, or if the current token predates the user:read:chat scope and needs a reconnect. */
+  chatCommandsActive: boolean
 }

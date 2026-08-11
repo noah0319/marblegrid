@@ -33,6 +33,21 @@
   font-size: 12px;
 }
 
+.settings__commands {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings__commands li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
 .settings__field {
   margin-bottom: 14px;
 }

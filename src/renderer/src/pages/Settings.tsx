@@ -135,12 +135,21 @@ export default function Settings(): React.JSX.Element {
         </p>
 
         {status?.connected ? (
-          <div className="settings__connected">
-            <span className="settings__connected-dot" />
-            Connected as <strong>{status.login}</strong>
-            <button type="button" className="settings__btn settings__btn--ghost" onClick={() => void disconnect()}>
-              Disconnect
-            </button>
+          <div>
+            <div className="settings__connected">
+              <span className="settings__connected-dot" />
+              Connected as <strong>{status.login}</strong>
+              <button type="button" className="settings__btn settings__btn--ghost" onClick={() => void disconnect()}>
+                Disconnect
+              </button>
+            </div>
+            {!status.chatCommandsActive && (
+              <p className="settings__hint">
+                Chat commands aren&apos;t active on this connection yet — this usually means it was made before
+                chat commands existed. Click <strong>Disconnect</strong>, then reconnect and re-authorize once
+                more to grant the added permission.
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -249,6 +258,43 @@ export default function Settings(): React.JSX.Element {
               Defaults off on purpose. Verify with a test post and watch the dashboard track correctly for a
               bit before turning this on — and ideally on a low-stakes stream, not a big event night.
             </p>
+          </>
+        )}
+      </section>
+
+      <section className="settings__card">
+        <h2 className="settings__card-title">Chat commands</h2>
+        {!status?.connected ? (
+          <p className="settings__hint">Connect Twitch above first.</p>
+        ) : (
+          <>
+            <p className="settings__hint">
+              {status.chatCommandsActive
+                ? 'Active — any viewer can use these in chat:'
+                : 'Not active on this connection yet (see the note above) — once reconnected, viewers can use:'}
+            </p>
+            <ul className="settings__commands">
+              <li>
+                <span className="settings__mono">!mystats</span> or <span className="settings__mono">!mymarble</span>{' '}
+                — their own points and races today
+              </li>
+              <li>
+                <span className="settings__mono">!mywins</span> — their own wins this season
+              </li>
+              <li>
+                <span className="settings__mono">!top10today</span> — today&apos;s top 10
+              </li>
+              <li>
+                <span className="settings__mono">!top10season</span> — this season&apos;s top 10
+              </li>
+              <li>
+                <span className="settings__mono">!racehs</span> — the season&apos;s highest single-race score
+              </li>
+              <li>
+                <span className="settings__mono">!ghostballs &lt;map&gt;</span> — that map&apos;s best time and
+                who holds it
+              </li>
+            </ul>
           </>
         )}
       </section>

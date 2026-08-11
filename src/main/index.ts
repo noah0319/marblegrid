@@ -5,6 +5,8 @@ import { initDb } from './backend/db/db.ts'
 import { startWatcher } from './backend/watcher/fileWatcher.ts'
 import { reconcileSeasonsAtStartup } from './backend/watcher/seasonDetector.ts'
 import { initSettingsStore } from './backend/twitch/settingsStore.ts'
+import { isConnected } from './backend/twitch/auth.ts'
+import { startChatListener } from './backend/twitch/chatListener.ts'
 import { SERVER_PORT } from '../shared/constants.ts'
 
 let mainWindow: BrowserWindow | null = null
@@ -103,6 +105,12 @@ if (!gotLock) {
     try {
       initDb(join(app.getPath('userData'), 'marblegrid.db'))
       initSettingsStore(join(app.getPath('userData'), 'twitch-settings.json'))
+      // Resume chat commands across restarts if already connected from a
+      // prior session — same "resume, don't require re-clicking Connect"
+      // spirit as ensureProvider()'s lazy auth resumption. Wrapped so a
+      // failure here (eg. Twitch/network hiccup) can't take down startup —
+      // core race-tracking must not depend on chat commands working.
+      if (isConnected()) startChatListener()
       reconcileSeasonsAtStartup()
       startWatcher()
       await startServer(SERVER_PORT)

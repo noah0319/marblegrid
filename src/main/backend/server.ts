@@ -22,6 +22,7 @@ import {
 } from './twitch/auth.ts'
 import { sendTestPost } from './twitch/chatPoster.ts'
 import { buildChatMessage } from './twitch/messageTemplates.ts'
+import { startChatListener, stopChatListener, isChatListenerActive } from './twitch/chatListener.ts'
 import type { TwitchStatus } from '../../shared/types.ts'
 
 /**
@@ -89,7 +90,8 @@ export async function startServer(port: number): Promise<void> {
       hasCredentials: Boolean(settings.clientId && settings.clientSecret),
       connected: isConnected(),
       login: settings.login,
-      autoPostEnabled: settings.autoPostEnabled
+      autoPostEnabled: settings.autoPostEnabled,
+      chatCommandsActive: isChatListenerActive()
     }
     res.json(status)
   })
@@ -115,6 +117,7 @@ export async function startServer(port: number): Promise<void> {
   })
 
   app.post('/api/twitch/disconnect', (_req, res) => {
+    stopChatListener()
     disconnect()
     res.json({ ok: true })
   })
@@ -181,7 +184,10 @@ export async function startServer(port: number): Promise<void> {
     }
 
     handleOAuthCallback(code)
-      .then(({ login }) => res.send(oauthResultPage(true, `Connected as ${login}.`)))
+      .then(({ login }) => {
+        startChatListener()
+        res.send(oauthResultPage(true, `Connected as ${login}.`))
+      })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err)
         res.status(500).send(oauthResultPage(false, message))

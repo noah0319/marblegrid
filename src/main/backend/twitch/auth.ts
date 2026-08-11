@@ -4,12 +4,16 @@ import { getSettings, updateSettings } from './settingsStore.ts'
 import { SERVER_PORT } from '../../../shared/constants.ts'
 
 export const OAUTH_REDIRECT_URI = `http://localhost:${SERVER_PORT}/oauth/callback`
-// user:write:chat is the only scope this needs — MarbleGrid never reads
-// chat (the game itself handles !play etc.), it only ever sends one message
-// per completed race via the Helix Send Chat Message API. Since Noah is
-// both the token owner and the broadcaster posting into his own channel,
-// no additional bot/moderator scopes apply — see 02 Twitch Integration.
-const SCOPES = ['user:write:chat']
+// user:write:chat — sending race-result posts and command replies via the
+// Helix Send Chat Message API.
+// user:read:chat — added for chat commands (!mystats etc.): required by
+// EventSub's channel.chat.message subscription for the user specified as
+// the "reading user." Since Noah is both the token owner and the
+// broadcaster, no additional bot/moderator scopes apply — see
+// 02 Twitch Integration. Adding this scope after user:write:chat was
+// already granted requires Noah to reconnect (Twitch scopes aren't
+// upgradeable on an existing token without a fresh consent screen).
+const SCOPES = ['user:write:chat', 'user:read:chat']
 
 let authProvider: RefreshingAuthProvider | null = null
 let apiClient: ApiClient | null = null

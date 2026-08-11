@@ -137,6 +137,14 @@ async function takeShots(app) {
     const settingsShot = path.join(OUT_DIR, '02b-settings.png')
     await page.screenshot({ path: settingsShot })
     console.log('screenshot:', settingsShot)
+
+    // Settings keeps growing (Twitch connection, chat posting, chat
+    // commands, stats) — full-page screenshot so new cards at the bottom
+    // (like the chat commands list) actually get looked at, not just
+    // whatever fits above the fold.
+    const settingsFullShot = path.join(OUT_DIR, '02b-settings-full.png')
+    await page.screenshot({ path: settingsFullShot, fullPage: true })
+    console.log('screenshot:', settingsFullShot)
   } else {
     console.log('WARNING: could not find Settings nav button to click')
   }
