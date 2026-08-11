@@ -38,6 +38,22 @@ test('surfaces the real confirmed race as a normalized event summary', () => {
   assert.equal(latest?.topFinishers[1]?.points, 4234)
 })
 
+test('allScorers lists every real participant who earned points, uncapped — topFinishers stays capped at 3', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+
+  const latest = getLatestEvent()
+  // Real fixture: 49 participants, exactly 12 with SeasonPointsEarned > 0
+  // (the rest are 0 — DNF/eliminated-before-scoring). allScorers must
+  // include all 12, not just the top 3 the overlay's HUD toast wants.
+  assert.equal(latest?.allScorers.length, 12)
+  assert.equal(latest?.allScorers[0]?.name, 'schoklad')
+  assert.equal(latest?.allScorers[0]?.points, 4602)
+  assert.equal(latest?.allScorers[11]?.name, 'craPPed_')
+  assert.equal(latest?.allScorers[11]?.points, 1564)
+  assert.ok(latest?.allScorers.every((s) => s.points > 0))
+  assert.equal(latest?.topFinishers.length, 3)
+})
+
 test('picks whichever event actually happened most recently, not just "the race table"', () => {
   // Race ingested first, Tilt ingested second -> Tilt's captured_at_local is
   // later, so it should win even though Race is checked first in the query.
@@ -61,4 +77,9 @@ test('tilt winner resolution is not fooled by an all-zero-points tie (the real-d
   assert.equal(latest?.kind, 'tilt')
   assert.equal(latest?.winnerName, 'Lunchbox701')
   assert.equal(latest?.winnerPoints, 0)
+  // Nobody scored above 0 in this real sample — allScorers must come back
+  // empty rather than including a pile of 0-point rows, so buildChatMessage
+  // knows to fall back to winner-only phrasing instead of an empty-looking
+  // "Also scoring:" list.
+  assert.equal(latest?.allScorers.length, 0)
 })

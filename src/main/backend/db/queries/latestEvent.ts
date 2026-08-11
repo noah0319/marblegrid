@@ -56,13 +56,23 @@ export function getLatestEvent(): LatestEventSummary | null {
       )
       .all(race.id) as unknown as { name: string; points: number }[]
 
+    const allScorers = db
+      .prepare(
+        `SELECT r.display_name as name, rp.season_points_earned as points
+         FROM race_participants rp JOIN racers r ON r.id = rp.racer_id
+         WHERE rp.race_event_id = ? AND rp.season_points_earned > 0
+         ORDER BY rp.season_points_earned DESC`
+      )
+      .all(race.id) as unknown as { name: string; points: number }[]
+
     return {
       kind: 'race',
       occurredAt: race.captured_at_local,
       label: race.map_name,
       winnerName: topFinishers[0]?.name ?? race.winner_username,
       winnerPoints: topFinishers[0]?.points ?? 0,
-      topFinishers
+      topFinishers,
+      allScorers
     }
   }
 
@@ -90,13 +100,23 @@ export function getLatestEvent(): LatestEventSummary | null {
       | { name: string; points: number }
       | undefined
 
+    const allScorers = db
+      .prepare(
+        `SELECT r.display_name as name, tp.level_points_earned as points
+         FROM tilt_participants tp JOIN racers r ON r.id = tp.racer_id
+         WHERE tp.tilt_event_id = ? AND tp.level_points_earned > 0
+         ORDER BY tp.level_points_earned DESC`
+      )
+      .all(tilt.id) as unknown as { name: string; points: number }[]
+
     return {
       kind: 'tilt',
       occurredAt: tilt.captured_at_local,
       label: `Tilted — Level ${tilt.level}`,
       winnerName: topTiltee?.name ?? tilt.top_tiltee_username,
       winnerPoints: topTiltee?.points ?? topFinishers[0]?.points ?? 0,
-      topFinishers
+      topFinishers,
+      allScorers
     }
   }
 
@@ -108,10 +128,20 @@ export function getLatestEvent(): LatestEventSummary | null {
     )
     .all(winner.id) as unknown as { name: string; points: number }[]
 
+  const allScorers = db
+    .prepare(
+      `SELECT r.display_name as name, rp.points_earned as points
+       FROM royale_participants rp JOIN racers r ON r.id = rp.racer_id
+       WHERE rp.royale_event_id = ? AND rp.points_earned > 0
+       ORDER BY rp.points_earned DESC`
+    )
+    .all(winner.id) as unknown as { name: string; points: number }[]
+
   return {
     kind: 'royale',
     occurredAt: royale!.captured_at_local,
     label: 'Battle Royale',
+    allScorers,
     winnerName: topFinishers[0]?.name ?? '',
     winnerPoints: topFinishers[0]?.points ?? 0,
     topFinishers

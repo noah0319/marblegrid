@@ -138,7 +138,10 @@ export interface LatestEventSummary {
   label: string
   winnerName: string
   winnerPoints: number
+  /** Top 3 by points, for the overlay toast's compact "winner + runners-up" display — keep this short, it's a HUD element. */
   topFinishers: { name: string; points: number }[]
+  /** Every participant who scored above 0, highest first, uncapped — for the chat post, which Noah wants to show everyone who got points, not just the top 3. */
+  allScorers: { name: string; points: number }[]
 }
 
 export interface TwitchStatus {

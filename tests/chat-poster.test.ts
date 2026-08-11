@@ -31,22 +31,54 @@ const raceEvent: LatestEventSummary = {
   topFinishers: [
     { name: 'schoklad', points: 4602 },
     { name: 'RahHerself', points: 4234 }
+  ],
+  allScorers: [
+    { name: 'schoklad', points: 4602 },
+    { name: 'RahHerself', points: 4234 },
+    { name: 'Coryash', points: 3866 }
   ]
 }
 
-test('buildChatMessage formats each event kind distinctly', () => {
+test('buildChatMessage formats each event kind distinctly, listing every scorer', () => {
   assert.equal(
     buildChatMessage(raceEvent),
-    'Race complete on feel the fire! schoklad takes it with 4,602 points.'
+    'Race complete on feel the fire! 🏆 schoklad wins with 4,602 points. Also scoring: RahHerself 4,234, Coryash 3,866'
   )
   assert.equal(
     buildChatMessage({ ...raceEvent, kind: 'tilt', label: 'Tilted — Level 13' }),
-    'Tilted level complete — Tilted — Level 13! schoklad takes it with 4,602 points.'
+    'Tilted level complete — Tilted — Level 13! 🏆 schoklad wins with 4,602 points. Also scoring: RahHerself 4,234, Coryash 3,866'
   )
   assert.equal(
     buildChatMessage({ ...raceEvent, kind: 'royale', label: 'Battle Royale' }),
-    'Battle Royale complete! schoklad takes it with 4,602 points.'
+    'Battle Royale complete! 🏆 schoklad wins with 4,602 points. Also scoring: RahHerself 4,234, Coryash 3,866'
   )
+})
+
+test('buildChatMessage falls back to winner-only when nobody scored above 0 (eg. a Tilt level nobody finished)', () => {
+  assert.equal(
+    buildChatMessage({ ...raceEvent, winnerPoints: 0, allScorers: [] }),
+    'Race complete on feel the fire! schoklad takes it with 0 points.'
+  )
+})
+
+test('buildChatMessage omits "Also scoring" when only the winner actually scored', () => {
+  assert.equal(
+    buildChatMessage({ ...raceEvent, allScorers: [{ name: 'schoklad', points: 4602 }] }),
+    'Race complete on feel the fire! 🏆 schoklad wins with 4,602 points.'
+  )
+})
+
+test('buildChatMessage truncates a long scorer list with "+N more" instead of exceeding the 500-char Twitch limit', () => {
+  const manyScorers = Array.from({ length: 60 }, (_, i) => ({
+    name: `RacerWithALongUsername${i}`,
+    points: 1000 - i
+  }))
+  const message = buildChatMessage({ ...raceEvent, allScorers: manyScorers })
+  assert.ok(message.length <= 500, `expected <=500 chars, got ${message.length}`)
+  assert.match(message, /\+\d+ more$/)
+  // The winner and the highest-ranked runners-up must never be the ones cut —
+  // truncation drops from the tail (lowest scorers), not the front.
+  assert.match(message, /RacerWithALongUsername0\b/)
 })
 
 test('does nothing when auto-post is off (the default)', async () => {
