@@ -30,13 +30,18 @@ export default defineConfig({
     plugins: [react()],
     build: {
       rollupOptions: {
-        // Two HTML entries in the same renderer root (simpler and more
+        // HTML entries in the same renderer root (simpler and more
         // reliable with Vite's dev/build tooling than a separate top-level
         // overlay/ folder outside this root, which the original plan
         // sketched — see the Phase 4 iteration log for why this changed).
+        // The overlay is two entries, not one: split per Noah's request so
+        // the result toast and the leaderboard ticker are independent OBS
+        // Browser Sources he can position separately, instead of one
+        // combined page with both stuck at fixed relative positions.
         input: {
           index: resolve('src/renderer/index.html'),
-          overlay: resolve('src/renderer/overlay.html')
+          'overlay-toast': resolve('src/renderer/overlay-toast.html'),
+          'overlay-leaderboard': resolve('src/renderer/overlay-leaderboard.html')
         }
       }
     }

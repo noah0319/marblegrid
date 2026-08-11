@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*;"
+    />
+    <title>MarbleGrid Overlay — Leaderboard</title>
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <style>
+      /* Belt-and-suspenders with overlay.css — OBS's Browser Source needs a
+         genuinely transparent page, not just a dark one, so this is set
+         inline too in case the stylesheet hasn't painted yet on first load. */
+      html,
+      body {
+        background: transparent;
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/overlay-leaderboard-main.tsx"></script>
+  </body>
+</html>

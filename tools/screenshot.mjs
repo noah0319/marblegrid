@@ -151,22 +151,30 @@ async function takeShots(app) {
 
   // Phase 4: the overlay is a plain HTTP page now (that's the whole point —
   // OBS needs a URL), so navigate the same window to it directly rather than
-  // needing a second Electron window. Inject a fake "gameplay" backdrop
-  // first so transparency/legibility can actually be judged — a raw
-  // transparent PNG is hard to eyeball meaningfully on its own.
-  await page.goto('http://127.0.0.1:43117/overlay')
-  await page.waitForTimeout(1500)
-  await page.evaluate(() => {
-    const backdrop = document.createElement('div')
-    backdrop.style.position = 'fixed'
-    backdrop.style.inset = '0'
-    backdrop.style.zIndex = '-1'
-    backdrop.style.background = 'linear-gradient(135deg, #2b5876, #4e4376 40%, #1f4037 70%, #99f2c8)'
-    document.body.prepend(backdrop)
-  })
-  const overlayShot = path.join(OUT_DIR, '03-overlay-simulated.png')
-  await page.screenshot({ path: overlayShot })
-  console.log('screenshot:', overlayShot)
+  // needing a second Electron window. Two separate pages now (split into
+  // independent Browser Sources per Noah's request), each screenshotted on
+  // its own — that's the actual thing to verify, that each renders
+  // correctly in isolation, not just combined. Inject a fake "gameplay"
+  // backdrop first so transparency/legibility can actually be judged — a
+  // raw transparent PNG is hard to eyeball meaningfully on its own.
+  async function shootOverlay(url, outName) {
+    await page.goto(url)
+    await page.waitForTimeout(1500)
+    await page.evaluate(() => {
+      const backdrop = document.createElement('div')
+      backdrop.style.position = 'fixed'
+      backdrop.style.inset = '0'
+      backdrop.style.zIndex = '-1'
+      backdrop.style.background = 'linear-gradient(135deg, #2b5876, #4e4376 40%, #1f4037 70%, #99f2c8)'
+      document.body.prepend(backdrop)
+    })
+    const shot = path.join(OUT_DIR, outName)
+    await page.screenshot({ path: shot })
+    console.log('screenshot:', shot)
+  }
+
+  await shootOverlay('http://127.0.0.1:43117/overlay-toast', '03a-overlay-toast-simulated.png')
+  await shootOverlay('http://127.0.0.1:43117/overlay-leaderboard', '03b-overlay-leaderboard-simulated.png')
 }
 
 main().catch((err) => {

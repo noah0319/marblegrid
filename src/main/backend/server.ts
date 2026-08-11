@@ -221,9 +221,26 @@ export async function startServer(port: number): Promise<void> {
   // Only reflects whatever the last `npm run build` produced — the dev-mode
   // hot-reload server the desktop window uses doesn't drive this route; run
   // `npm run build` after overlay changes for OBS to see them.
+  //
+  // Two routes, not one: split into independent Browser Sources per Noah's
+  // request, so the result toast and the leaderboard ticker can be sized
+  // and positioned separately in OBS instead of being stuck together on one
+  // shared page at fixed relative positions.
+  //
+  // Flat names (/overlay-toast, not /overlay/toast) are load-bearing, not
+  // stylistic: electron-vite's renderer build emits relative asset paths
+  // (needed for the desktop window's file:// loadFile() to work), and a
+  // route with a real second path segment makes the browser resolve those
+  // relative to /overlay/ instead of /, 404ing every asset. A single flat
+  // segment resolves the same way the working /overlay route always did.
+  // Confirmed by hitting this for real: nested paths screenshotted as a
+  // blank page with console 404s before this fix.
   app.use(express.static(join(__dirname, '../renderer')))
-  app.get('/overlay', (_req, res) => {
-    res.sendFile(join(__dirname, '../renderer/overlay.html'))
+  app.get('/overlay-toast', (_req, res) => {
+    res.sendFile(join(__dirname, '../renderer/overlay-toast.html'))
+  })
+  app.get('/overlay-leaderboard', (_req, res) => {
+    res.sendFile(join(__dirname, '../renderer/overlay-leaderboard.html'))
   })
 
   const httpServer = createServer(app)
