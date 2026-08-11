@@ -11,7 +11,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "node --experimental-strip-types --test tests/race-ingest.test.ts tests/day-boundary.test.ts tests/stats.test.ts tests/latest-event.test.ts tests/chat-poster.test.ts tests/map-records.test.ts tests/chat-commands.test.ts",
-    "screenshot": "node tools/screenshot.mjs"
+    "screenshot": "node tools/screenshot.mjs",
+    "dist": "electron-vite build && electron-builder --win"
   },
   "dependencies": {
     "@twurple/api": "^8.1.4",
@@ -44,5 +45,22 @@
     "electron-winstaller@5.4.0": true,
     "esbuild@0.25.12": true,
     "esbuild@0.28.2": true
+  },
+  "build": {
+    "appId": "com.marblegrid.app",
+    "productName": "MarbleGrid",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
