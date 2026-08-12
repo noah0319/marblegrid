@@ -28,6 +28,7 @@ export default function Settings(): React.JSX.Element {
   const [testing, setTesting] = useState(false)
   const [previewResult, setPreviewResult] = useState<PreviewPostResult | null>(null)
   const [previewing, setPreviewing] = useState(false)
+  const [botConnecting, setBotConnecting] = useState(false)
 
   const refresh = useCallback(async () => {
     const res = await fetch(`${BASE}/api/twitch/status`)
@@ -50,6 +51,17 @@ export default function Settings(): React.JSX.Element {
     }, 2000)
     return () => clearInterval(timer)
   }, [connecting, refresh, status?.connected])
+
+  // Same pattern, for the optional bot account's own OAuth round-trip.
+  useEffect(() => {
+    if (!botConnecting) return
+    const timer = setInterval(() => {
+      void refresh().then(() => {
+        if (status?.botConnected) setBotConnecting(false)
+      })
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [botConnecting, refresh, status?.botConnected])
 
   async function saveCredentials(): Promise<void> {
     setSaving(true)
@@ -82,6 +94,16 @@ export default function Settings(): React.JSX.Element {
 
   async function disconnect(): Promise<void> {
     await fetch(`${BASE}/api/twitch/disconnect`, { method: 'POST' })
+    await refresh()
+  }
+
+  async function connectBot(): Promise<void> {
+    setBotConnecting(true)
+    await fetch(`${BASE}/api/twitch/bot-connect`, { method: 'POST' })
+  }
+
+  async function disconnectBot(): Promise<void> {
+    await fetch(`${BASE}/api/twitch/bot-disconnect`, { method: 'POST' })
     await refresh()
   }
 
@@ -200,6 +222,63 @@ export default function Settings(): React.JSX.Element {
                 automatically once it's done.
               </p>
             )}
+          </>
+        )}
+      </section>
+
+      <section className="settings__card">
+        <h2 className="settings__card-title">Bot account (optional)</h2>
+        {!status?.connected ? (
+          <p className="settings__hint">Connect Twitch above first.</p>
+        ) : status.botConnected ? (
+          <div>
+            <div className="settings__connected">
+              <span className="settings__connected-dot" />
+              Posting as <strong>{status.botLogin}</strong> instead of {status.login}
+              <button
+                type="button"
+                className="settings__btn settings__btn--ghost"
+                onClick={() => void disconnectBot()}
+              >
+                Disconnect bot
+              </button>
+            </div>
+            <p className="settings__hint">
+              Make sure <span className="settings__mono">{status.botLogin}</span> is modded in your own chat (
+              <span className="settings__mono">/mod {status.botLogin}</span>) — Twitch requires that for it to
+              post here at all. If sends start failing, that&apos;s the first thing to check.
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="settings__hint">
+              By default, everything posts as <strong>{status.login}</strong>. Connecting a separate account here
+              makes it post everything instead — race results, command replies, test/preview posts. Reuses the
+              same Client ID/Secret above; you&apos;ll just log into Twitch as the bot account instead of your
+              own during the next step.
+            </p>
+            <div className="settings__actions">
+              <button
+                type="button"
+                className="settings__btn settings__btn--accent"
+                disabled={botConnecting}
+                onClick={() => void connectBot()}
+              >
+                {botConnecting ? 'Waiting for you to authorize…' : 'Connect Bot Account'}
+              </button>
+            </div>
+            {botConnecting && (
+              <p className="settings__hint">
+                A browser tab should have opened to Twitch&apos;s own site — log in as the <em>bot&apos;s</em>{' '}
+                account there, not your own, then Authorize.
+              </p>
+            )}
+            <p className="settings__hint">
+              After connecting, go to your own Twitch chat and type <span className="settings__mono">/mod</span>{' '}
+              followed by the bot&apos;s username — Twitch requires the bot to be a moderator in your channel to
+              post there as a separate account. This is a normal Twitch chat command, not something MarbleGrid
+              can do for you.
+            </p>
           </>
         )}
       </section>

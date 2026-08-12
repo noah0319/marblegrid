@@ -19,6 +19,13 @@ export interface TwitchSettings {
   token: AccessToken | null
   userId: string | null
   login: string | null
+  // Optional second connection — a separate account that, if connected,
+  // posts everything instead of Noah's own account. Reuses the SAME
+  // clientId/clientSecret (same registered Twitch app; a different Twitch
+  // login just authorizes it), so no separate credential fields needed.
+  botToken: AccessToken | null
+  botUserId: string | null
+  botLogin: string | null
 }
 
 const DEFAULTS: TwitchSettings = {
@@ -27,7 +34,10 @@ const DEFAULTS: TwitchSettings = {
   autoPostEnabled: false,
   token: null,
   userId: null,
-  login: null
+  login: null,
+  botToken: null,
+  botUserId: null,
+  botLogin: null
 }
 
 let settingsPath: string | null = null

@@ -1,5 +1,5 @@
 import { EventSubWsListener } from '@twurple/eventsub-ws'
-import { getApiClient, getBroadcasterUserId } from './auth.ts'
+import { getApiClient, getBroadcasterUserId, sendChatMessageAsConfigured } from './auth.ts'
 import { handleChatCommand } from './commands.ts'
 
 /**
@@ -53,7 +53,8 @@ export function startChatListener(): void {
       })
       if (!reply) return
 
-      apiClient.chat.sendChatMessage(broadcasterId, reply).catch((err: unknown) => {
+      // Routes through the bot account if one's connected, else Noah's own.
+      sendChatMessageAsConfigured(broadcasterId, reply).catch((err: unknown) => {
         // eslint-disable-next-line no-console
         console.error('MarbleGrid: failed to send chat command reply:', err)
       })

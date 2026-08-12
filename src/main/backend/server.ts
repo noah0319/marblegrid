@@ -18,7 +18,11 @@ import {
   isConnected,
   disconnect,
   getApiClient,
-  getBroadcasterUserId
+  getBroadcasterUserId,
+  isBotConnected,
+  disconnectBot,
+  sendChatMessageAsConfigured,
+  type ConnectionPurpose
 } from './twitch/auth.ts'
 import { sendTestPost } from './twitch/chatPoster.ts'
 import { buildChatMessage } from './twitch/messageTemplates.ts'
@@ -91,7 +95,9 @@ export async function startServer(port: number): Promise<void> {
       connected: isConnected(),
       login: settings.login,
       autoPostEnabled: settings.autoPostEnabled,
-      chatCommandsActive: isChatListenerActive()
+      chatCommandsActive: isChatListenerActive(),
+      botConnected: isBotConnected(),
+      botLogin: settings.botLogin
     }
     res.json(status)
   })
@@ -108,7 +114,7 @@ export async function startServer(port: number): Promise<void> {
 
   app.post('/api/twitch/connect', (_req, res) => {
     try {
-      const url = getAuthorizeUrl()
+      const url = getAuthorizeUrl('main')
       void shell.openExternal(url)
       res.json({ ok: true })
     } catch (err) {
@@ -119,6 +125,26 @@ export async function startServer(port: number): Promise<void> {
   app.post('/api/twitch/disconnect', (_req, res) => {
     stopChatListener()
     disconnect()
+    res.json({ ok: true })
+  })
+
+  // Optional second account that, once connected AND modded in Noah's own
+  // chat (Twitch requires that for this send mechanism — see
+  // sendChatMessageAsConfigured), posts everything instead of the main
+  // account. Reuses the same Client ID/Secret already saved — a different
+  // Twitch login is what actually distinguishes this from /connect.
+  app.post('/api/twitch/bot-connect', (_req, res) => {
+    try {
+      const url = getAuthorizeUrl('bot')
+      void shell.openExternal(url)
+      res.json({ ok: true })
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  app.post('/api/twitch/bot-disconnect', (_req, res) => {
+    disconnectBot()
     res.json({ ok: true })
   })
 
@@ -155,8 +181,8 @@ export async function startServer(port: number): Promise<void> {
       return
     }
     const message = buildChatMessage(event)
-    apiClient.chat
-      .sendChatMessage(broadcasterId, message)
+    // Routes through the bot account if one's connected, else Noah's own.
+    sendChatMessageAsConfigured(broadcasterId, message)
       .then(() => res.json({ attempted: true, success: true, message }))
       .catch((err: unknown) => {
         res
@@ -165,14 +191,18 @@ export async function startServer(port: number): Promise<void> {
       })
   })
 
-  // Twitch redirects here after Noah authorizes (or declines) on Twitch's
+  // Twitch redirects here after someone authorizes (or declines) on Twitch's
   // own site — see 02 Twitch Integration for the human-facing walkthrough.
+  // Both the main and bot connect flows land here (one registered redirect
+  // URL) — `state` is what Twitch round-trips back to tell them apart.
   app.get('/oauth/callback', (req, res) => {
-    const { code, error, error_description: errorDescription } = req.query as {
+    const { code, error, error_description: errorDescription, state } = req.query as {
       code?: string
       error?: string
       error_description?: string
+      state?: string
     }
+    const purpose: ConnectionPurpose = state === 'bot' ? 'bot' : 'main'
 
     if (error) {
       res.status(400).send(oauthResultPage(false, errorDescription ?? error))
@@ -183,10 +213,13 @@ export async function startServer(port: number): Promise<void> {
       return
     }
 
-    handleOAuthCallback(code)
+    handleOAuthCallback(code, purpose)
       .then(({ login }) => {
-        startChatListener()
-        res.send(oauthResultPage(true, `Connected as ${login}.`))
+        // Chat-reading (commands) is always tied to the main account —
+        // connecting a bot never needs to (re)start this.
+        if (purpose === 'main') startChatListener()
+        const label = purpose === 'bot' ? `Bot connected as ${login}.` : `Connected as ${login}.`
+        res.send(oauthResultPage(true, label))
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err)

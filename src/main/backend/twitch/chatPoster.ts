@@ -1,6 +1,6 @@
 import { getDb } from '../db/db.ts'
 import { getSettings } from './settingsStore.ts'
-import { getApiClient, getBroadcasterUserId } from './auth.ts'
+import { getBroadcasterUserId, sendChatMessageAsConfigured } from './auth.ts'
 import { buildChatMessage, TEST_POST_MESSAGE } from './messageTemplates.ts'
 import type { LatestEventSummary } from '../../../shared/types.ts'
 
@@ -13,11 +13,9 @@ export interface ChatPostResult {
 
 type SendFn = (broadcasterId: string, message: string) => Promise<void>
 
-async function defaultSend(broadcasterId: string, message: string): Promise<void> {
-  const apiClient = getApiClient()
-  if (!apiClient) throw new Error('Twitch is not connected')
-  await apiClient.chat.sendChatMessage(broadcasterId, message)
-}
+// Routes through the bot account if one's connected, else Noah's own —
+// see sendChatMessageAsConfigured for the actual decision.
+const defaultSend: SendFn = sendChatMessageAsConfigured
 
 /**
  * Called after a Race/Tilt/Royale event successfully commits to the

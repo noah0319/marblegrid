@@ -161,4 +161,7 @@ export interface TwitchStatus {
   autoPostEnabled: boolean
   /** Whether the chat-commands listener (!mystats etc.) is actually running — false if never started, or if the current token predates the user:read:chat scope and needs a reconnect. */
   chatCommandsActive: boolean
+  /** Optional second account — if connected, it posts everything instead of the main account. Never affects chat-commands reading, which always stays on the main connection. */
+  botConnected: boolean
+  botLogin: string | null
 }
