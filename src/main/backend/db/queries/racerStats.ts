@@ -33,6 +33,53 @@ export function getRacerTodayStats(username: string, dayBoundaryHour: number, no
   return row
 }
 
+export interface RacerSeasonStats {
+  racesPlayed: number
+  totalPoints: number
+}
+
+/**
+ * Season totals for one racer — points earned and races played, scoped the
+ * same way as the Leaderboard/getRacerSeasonWins (re.season_id IS ?, so a
+ * null seasonId correctly covers the bootstrap case too). Powers !mystats'
+ * season line and points-per-race; deliberately a SEPARATE query from
+ * getRacerTodayStats rather than reusing its window, since "today" and
+ * "season" are genuinely independent scopes — today's boundary can roll
+ * over mid-season, and a racer's season total must not silently reset with
+ * it.
+ */
+export function getRacerSeasonStats(username: string, seasonId: number | null): RacerSeasonStats {
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT
+         COUNT(DISTINCT re.id) as racesPlayed,
+         COALESCE(SUM(rp.season_points_earned), 0) as totalPoints
+       FROM race_participants rp
+       JOIN race_events re ON re.id = rp.race_event_id
+       JOIN racers r ON r.id = rp.racer_id
+       WHERE r.username = ? COLLATE NOCASE AND re.season_id IS ?`
+    )
+    .get(username, seasonId) as unknown as RacerSeasonStats
+  return row
+}
+
+/**
+ * The stored in-game display name for a username, or null if it's never
+ * been seen. Used when looking up someone ELSE's stats via !mystats
+ * @username — unlike the caller's own stats (where ctx.chatterDisplayName
+ * comes straight from their live Twitch identity), a looked-up target's only
+ * available display form is whatever the game itself last reported for
+ * them.
+ */
+export function getRacerDisplayName(username: string): string | null {
+  const db = getDb()
+  const row = db.prepare(`SELECT display_name as displayName FROM racers WHERE username = ? COLLATE NOCASE`).get(username) as
+    | { displayName: string }
+    | undefined
+  return row?.displayName ?? null
+}
+
 /** Wins (position 1) for one racer, scoped to a season the same way the Leaderboard is — null seasonId covers the bootstrap case. */
 export function getRacerSeasonWins(username: string, seasonId: number | null): number {
   const db = getDb()

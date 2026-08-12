@@ -1,4 +1,10 @@
-import { getRacerTodayStats, getRacerSeasonWins, racerHasEverRaced } from '../db/queries/racerStats.ts'
+import {
+  getRacerTodayStats,
+  getRacerSeasonStats,
+  getRacerSeasonWins,
+  racerHasEverRaced,
+  getRacerDisplayName
+} from '../db/queries/racerStats.ts'
 import { getTodayLeaderboard, getLeaderboard } from '../db/queries/leaderboard.ts'
 import { getMapRecords } from '../db/queries/mapRecords.ts'
 import { getSeasonStats } from '../db/queries/stats.ts'
@@ -72,22 +78,53 @@ export function handleChatCommand(messageText: string, ctx: ChatCommandContext):
   return def.handler(args, ctx)
 }
 
-function myStats(_args: string, ctx: ChatCommandContext): string {
-  if (!racerHasEverRaced(ctx.chatterName)) {
-    return `@${ctx.chatterDisplayName} hasn't raced yet — hop in with !play!`
-  }
-  const stats = getRacerTodayStats(ctx.chatterName, DEFAULT_DAY_BOUNDARY_HOUR, ctx.now)
-  const raceWord = stats.racesPlayed === 1 ? 'race' : 'races'
-  return `@${ctx.chatterDisplayName}: ${formatFullNumber(stats.totalPoints)} points across ${stats.racesPlayed} ${raceWord} today.`
+interface TargetRacer {
+  /** For DB lookups — every query here is COLLATE NOCASE anyway, but this keeps intent explicit. */
+  username: string
+  /** Best available form for the reply text. */
+  displayName: string
 }
 
-function myWins(_args: string, ctx: ChatCommandContext): string {
-  if (!racerHasEverRaced(ctx.chatterName)) {
-    return `@${ctx.chatterDisplayName} hasn't raced yet — hop in with !play!`
+/**
+ * No argument means "me" — resolved from the caller's own live Twitch
+ * identity, same as before. An argument (`!mystats @someone` or `!mystats
+ * someone` — the @ is optional, stripped either way) means "look up someone
+ * else": Noah's ask, so chat can check a friend's stats, not just their own.
+ * We don't have a looked-up target's live Twitch identity (they didn't send
+ * this message) — the best available display form is whatever the game
+ * itself last reported for them, falling back to echoing back whatever the
+ * caller typed if that person's never raced at all.
+ */
+function resolveTarget(args: string, ctx: ChatCommandContext): TargetRacer {
+  const trimmed = args.trim().replace(/^@/, '').trim()
+  if (!trimmed) return { username: ctx.chatterName, displayName: ctx.chatterDisplayName }
+  return { username: trimmed, displayName: getRacerDisplayName(trimmed) ?? trimmed }
+}
+
+function myStats(args: string, ctx: ChatCommandContext): string {
+  const target = resolveTarget(args, ctx)
+  if (!racerHasEverRaced(target.username)) {
+    return `@${target.displayName} hasn't raced yet — hop in with !play!`
   }
-  const wins = getRacerSeasonWins(ctx.chatterName, getOpenSeasonId())
+  const today = getRacerTodayStats(target.username, DEFAULT_DAY_BOUNDARY_HOUR, ctx.now)
+  const season = getRacerSeasonStats(target.username, getOpenSeasonId())
+  const todayRaceWord = today.racesPlayed === 1 ? 'race' : 'races'
+  const seasonRaceWord = season.racesPlayed === 1 ? 'race' : 'races'
+  const ppr = season.racesPlayed > 0 ? season.totalPoints / season.racesPlayed : 0
+  return (
+    `@${target.displayName}: Today: ${formatFullNumber(today.totalPoints)} pts (${today.racesPlayed} ${todayRaceWord}) | ` +
+    `Season: ${formatFullNumber(season.totalPoints)} pts, ${season.racesPlayed} ${seasonRaceWord}, ${formatFullNumber(ppr)} PPR.`
+  )
+}
+
+function myWins(args: string, ctx: ChatCommandContext): string {
+  const target = resolveTarget(args, ctx)
+  if (!racerHasEverRaced(target.username)) {
+    return `@${target.displayName} hasn't raced yet — hop in with !play!`
+  }
+  const wins = getRacerSeasonWins(target.username, getOpenSeasonId())
   const winWord = wins === 1 ? 'win' : 'wins'
-  return `@${ctx.chatterDisplayName} has ${wins} ${winWord} this season.`
+  return `@${target.displayName} has ${wins} ${winWord} this season.`
 }
 
 function top10Today(): string {

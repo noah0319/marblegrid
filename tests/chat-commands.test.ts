@@ -58,10 +58,13 @@ test('!mystats, !mymarble, and !myballs are true aliases — identical behavior'
   assert.equal(a, c)
 })
 
-test('!mystats reports real points and race count for today, using the real fixture', () => {
+test('!mystats reports today AND season stats (points, races, PPR), using the real fixture', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
   const reply = handleChatCommand('!mystats', ctx())
-  assert.equal(reply, '@schoklad: 4,602 points across 1 race today.')
+  // Only one race exists in this test, so today and season are identical
+  // here by coincidence, not because they're the same query — see the
+  // dedicated "can differ" test below for proof they're independent scopes.
+  assert.equal(reply, '@schoklad: Today: 4,602 pts (1 race) | Season: 4,602 pts, 1 race, 4,602 PPR.')
 })
 
 test('!mystats resolves the chatter to a racer case-insensitively', () => {
@@ -69,12 +72,53 @@ test('!mystats resolves the chatter to a racer case-insensitively', () => {
   // Twitch reports the chatter's login as "RahHerself" here; the racers
   // table has it lowercase ("rahherself") from the CSV's Username column.
   const reply = handleChatCommand('!mystats', ctx({ chatterName: 'RahHerself', chatterDisplayName: 'RahHerself' }))
-  assert.equal(reply, '@RahHerself: 4,234 points across 1 race today.')
+  assert.equal(reply, '@RahHerself: Today: 4,234 pts (1 race) | Season: 4,234 pts, 1 race, 4,234 PPR.')
 })
 
 test('!mystats is friendly to someone who has never raced, not a crash or a bare zero', () => {
   const reply = handleChatCommand('!mystats', ctx({ chatterName: 'totalstranger', chatterDisplayName: 'TotalStranger' }))
   assert.match(reply ?? '', /hasn't raced yet/)
+})
+
+test("!mystats season stats CAN differ from today's — they're independent scopes, not the same window read twice", () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // real captured_at_local = actual test-run time
+
+  // Push "today" far into the future so the real ingestion timestamp falls
+  // outside today's window, while season scoping (not day-based at all)
+  // still includes it.
+  const farFuture = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  const reply = handleChatCommand('!mystats', ctx({ now: farFuture }))
+  assert.match(reply ?? '', /Today: 0 pts \(0 races\)/)
+  assert.match(reply ?? '', /Season: 4,602 pts, 1 race, 4,602 PPR/)
+})
+
+test('!mystats @username looks up someone elses stats, not the callers own', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // includes schoklad and RahHerself
+  const reply = handleChatCommand('!mystats @RahHerself', ctx({ chatterId: 'caller', chatterName: 'schoklad', chatterDisplayName: 'schoklad' }))
+  assert.equal(reply, '@RahHerself: Today: 4,234 pts (1 race) | Season: 4,234 pts, 1 race, 4,234 PPR.')
+})
+
+test('!mystats username also works without the leading @', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const reply = handleChatCommand('!mystats RahHerself', ctx({ chatterId: 'caller', chatterName: 'schoklad', chatterDisplayName: 'schoklad' }))
+  assert.match(reply ?? '', /^@RahHerself:/)
+})
+
+test('!mystats @username resolves the LOOKED-UP racers own stored display name, not whatever casing the caller typed', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const reply = handleChatCommand('!mystats @RAHHERSELF', ctx({ chatterId: 'caller', chatterName: 'schoklad', chatterDisplayName: 'schoklad' }))
+  assert.match(reply ?? '', /^@RahHerself:/, 'should show the stored "RahHerself" casing, not the typed "RAHHERSELF"')
+})
+
+test('!mystats @username for someone who has never raced is friendly, not a crash', () => {
+  const reply = handleChatCommand('!mystats @totalstranger', ctx())
+  assert.match(reply ?? '', /^@totalstranger hasn't raced yet/)
+})
+
+test('!mywins @username also looks up someone else, same mechanism as !mystats', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad is the real winner (position 1)
+  const reply = handleChatCommand('!mywins @schoklad', ctx({ chatterId: 'caller', chatterName: 'rahherself', chatterDisplayName: 'RahHerself' }))
+  assert.equal(reply, '@schoklad has 1 win this season.')
 })
 
 test('!mywins counts season wins (position 1) for the real winner', () => {
