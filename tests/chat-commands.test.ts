@@ -58,6 +58,21 @@ test('!mystats, !mymarble, and !myballs are true aliases — identical behavior'
   assert.equal(a, c)
 })
 
+test('!myballs @username is the same lookup as !mystats @username — same handler, Noah asked for this explicitly ("for the memes")', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // includes schoklad and RahHerself
+  const viaMystats = handleChatCommand('!mystats @RahHerself', ctx({ chatterId: 'caller-1' }))
+  const viaMyballs = handleChatCommand('!myballs @RahHerself', ctx({ chatterId: 'caller-2' }))
+  assert.ok(viaMystats)
+  assert.equal(viaMystats, viaMyballs)
+  assert.match(viaMyballs ?? '', /^@RahHerself:/)
+})
+
+test('!myballs username (no @) also works', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const reply = handleChatCommand('!myballs schoklad', ctx({ chatterId: 'caller-3', chatterName: 'rahherself', chatterDisplayName: 'RahHerself' }))
+  assert.match(reply ?? '', /^@schoklad:/)
+})
+
 test('!mystats reports today AND season stats (points, races, PPR), using the real fixture', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
   const reply = handleChatCommand('!mystats', ctx())
