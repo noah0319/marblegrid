@@ -62,7 +62,7 @@ test('picks whichever event actually happened most recently, not just "the race 
 
   const latest = getLatestEvent()
   assert.equal(latest?.kind, 'tilt')
-  assert.equal(latest?.label, 'Tilted — Level 13')
+  assert.equal(latest?.label, 'Level 13')
   // Properly-cased display name, resolved by direct username lookup — not
   // whichever 0-point participant an unstable ORDER BY tie-break sorted
   // first (every participant in this real sample has 0 points: nobody

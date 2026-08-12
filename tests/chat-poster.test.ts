@@ -39,33 +39,43 @@ const raceEvent: LatestEventSummary = {
   ]
 }
 
-test('buildChatMessage formats each event kind distinctly, listing every scorer', () => {
+test('buildChatMessage formats each event kind distinctly, listing every scorer with medals', () => {
   assert.equal(
     buildChatMessage(raceEvent),
-    'Race complete on feel the fire! 🏆 schoklad wins with 4,602 points. Also scoring: RahHerself 4,234, Coryash 3,866'
+    '🏁 Race Results (feel the fire): 🥇 #1: schoklad - 4,602 points | 🥈 #2: RahHerself - 4,234 points | 🥉 #3: Coryash - 3,866 points'
   )
   assert.equal(
-    buildChatMessage({ ...raceEvent, kind: 'tilt', label: 'Tilted — Level 13' }),
-    'Tilted level complete — Tilted — Level 13! 🏆 schoklad wins with 4,602 points. Also scoring: RahHerself 4,234, Coryash 3,866'
+    buildChatMessage({ ...raceEvent, kind: 'tilt', label: 'Level 13' }),
+    '🏁 Tilted Results (Level 13): 🥇 #1: schoklad - 4,602 points | 🥈 #2: RahHerself - 4,234 points | 🥉 #3: Coryash - 3,866 points'
   )
   assert.equal(
     buildChatMessage({ ...raceEvent, kind: 'royale', label: 'Battle Royale' }),
-    'Battle Royale complete! 🏆 schoklad wins with 4,602 points. Also scoring: RahHerself 4,234, Coryash 3,866'
+    '🏁 Battle Royale Results: 🥇 #1: schoklad - 4,602 points | 🥈 #2: RahHerself - 4,234 points | 🥉 #3: Coryash - 3,866 points'
   )
 })
 
-test('buildChatMessage falls back to winner-only when nobody scored above 0 (eg. a Tilt level nobody finished)', () => {
+test('buildChatMessage falls back to a single-entry winner list when nobody scored above 0 (eg. a Tilt level nobody finished)', () => {
   assert.equal(
     buildChatMessage({ ...raceEvent, winnerPoints: 0, allScorers: [] }),
-    'Race complete on feel the fire! schoklad takes it with 0 points.'
+    '🏁 Race Results (feel the fire): 🥇 #1: schoklad - 0 points'
   )
 })
 
-test('buildChatMessage omits "Also scoring" when only the winner actually scored', () => {
+test('buildChatMessage handles exactly one scorer as a single-entry list (no trailing separator)', () => {
   assert.equal(
     buildChatMessage({ ...raceEvent, allScorers: [{ name: 'schoklad', points: 4602 }] }),
-    'Race complete on feel the fire! 🏆 schoklad wins with 4,602 points.'
+    '🏁 Race Results (feel the fire): 🥇 #1: schoklad - 4,602 points'
   )
+})
+
+test('only the top 3 get medals — 4th place onward is a plain #N with no medal prefix', () => {
+  const fourthPlace = buildChatMessage({
+    ...raceEvent,
+    allScorers: [...raceEvent.allScorers, { name: 'JackDaniels54', points: 3498 }]
+  })
+  // Exact match on "| #4: Name" (not "| <medal> #4: Name") proves rank 4 got
+  // no medal — a looser regex could pass even if a 4th medal leaked in.
+  assert.match(fourthPlace, /\| #4: JackDaniels54 - 3,498 points$/)
 })
 
 test('buildChatMessage truncates a long scorer list with "+N more" instead of exceeding the 500-char Twitch limit', () => {

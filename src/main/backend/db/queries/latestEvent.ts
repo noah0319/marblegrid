@@ -112,7 +112,10 @@ export function getLatestEvent(): LatestEventSummary | null {
     return {
       kind: 'tilt',
       occurredAt: tilt.captured_at_local,
-      label: `Tilted — Level ${tilt.level}`,
+      // Just "Level N" — the overlay's own mode badge already says "TILTED"
+      // right above this, and the chat message header does too, so a
+      // "Tilted — " prefix here was pure redundancy in both places.
+      label: `Level ${tilt.level}`,
       winnerName: topTiltee?.name ?? tilt.top_tiltee_username,
       winnerPoints: topTiltee?.points ?? topFinishers[0]?.points ?? 0,
       topFinishers,
