@@ -8,7 +8,7 @@ import { getDb } from './db/db.ts'
 import { getOpenSeasonId } from './db/queries/seasons.ts'
 import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
 import { getLeaderboard } from './db/queries/leaderboard.ts'
-import { getMapRecords } from './db/queries/mapRecords.ts'
+import { getMapRecords, setMapRecordOverride, clearMapRecordOverride } from './db/queries/mapRecords.ts'
 import { getLatestEvent } from './db/queries/latestEvent.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 import { getSettings, updateSettings } from './twitch/settingsStore.ts'
@@ -80,6 +80,31 @@ export async function startServer(port: number): Promise<void> {
   // multi-streamer-friendly config surface).
   app.get('/api/map-records', (_req, res) => {
     res.json(getMapRecords())
+  })
+  // Manual override: replaces the automatic best-time computation for one
+  // map until cleared. Noah's ask, for correcting/seeding a record by hand.
+  app.post('/api/map-records/override', (req, res) => {
+    const { mapName, mapCreator, racerName, timeSeconds } = req.body as {
+      mapName?: string
+      mapCreator?: string
+      racerName?: string
+      timeSeconds?: number
+    }
+    if (!mapName || !mapCreator || !racerName || typeof timeSeconds !== 'number' || !(timeSeconds > 0)) {
+      res.status(400).json({ error: 'mapName, mapCreator, racerName, and a positive timeSeconds are all required' })
+      return
+    }
+    setMapRecordOverride({ mapName, mapCreator, racerName, timeSeconds })
+    res.json({ ok: true })
+  })
+  app.post('/api/map-records/clear-override', (req, res) => {
+    const { mapName, mapCreator } = req.body as { mapName?: string; mapCreator?: string }
+    if (!mapName || !mapCreator) {
+      res.status(400).json({ error: 'mapName and mapCreator are both required' })
+      return
+    }
+    clearMapRecordOverride(mapName, mapCreator)
+    res.json({ ok: true })
   })
   app.get('/api/latest-event', (_req, res) => {
     res.json(getLatestEvent())

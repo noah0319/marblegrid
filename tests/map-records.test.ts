@@ -5,7 +5,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { initDb, closeDb } from '../src/main/backend/db/db.ts'
 import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
-import { getMapRecords } from '../src/main/backend/db/queries/mapRecords.ts'
+import { getMapRecords, setMapRecordOverride, clearMapRecordOverride } from '../src/main/backend/db/queries/mapRecords.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURES_DIR = join(__dirname, 'fixtures')
@@ -28,6 +28,8 @@ test("the real fastest FINISHER wins the record, not an eliminated racer's short
   assert.equal(records[0]?.mapCreator, 'zim2325')
   assert.equal(records[0]?.racerName, 'schoklad')
   assert.equal(records[0]?.timeSeconds, 133.391144)
+  assert.equal(records[0]?.timesPlayed, 1)
+  assert.equal(records[0]?.isManualOverride, false)
   // The real fixture has several ELIMINATED racers with much shorter raw
   // TimeInRaceSeconds (eg. 29s, 69s) — that's how long they survived before
   // getting knocked out, not a finish time, and must never win a "record".
@@ -158,4 +160,134 @@ test('the same map NAME from a different CREATOR is a separate record, not merge
   assert.equal(someoneElses?.mapName, 'feel the fire')
   assert.equal(someoneElses?.racerName, 'ImpostorRacer')
   assert.equal(someoneElses?.timeSeconds, 50)
+})
+
+// A synthetic race where the sole participant is ELIMINATED — nobody
+// finishes. Used to prove timesPlayed is a genuine play count, not derived
+// from the same finisher-only logic that decides the record itself.
+function syntheticUnfinishedRace(opts: {
+  snapshotId: string
+  mapName: string
+  mapCreator?: string
+}): { summary: string; participants: string } {
+  const summary =
+    `SchemaVersion,SnapshotId,GeneratedAtUtc,Status,GameMode,SessionType,MapName,MapCreator,PlayerCount,FinishedCount,EliminatedCount,WinnerPlatform,WinnerUsername\n` +
+    `4,${opts.snapshotId},2026-08-10T16:59:03.229Z,Final,Custom Map Race,Qualifying,${opts.mapName},${opts.mapCreator ?? 'zim2325'},1,0,1,Twitch,nobody\n`
+  const participants =
+    `SnapshotId,Position,Username,DisplayName,Platform,NameColorHex,SeasonPointsEarned,SeasonPointsTotal,SeasonWinsTotal,SeasonMatchesPlayedTotal,TimeInRaceSeconds,Eliminated\n` +
+    `${opts.snapshotId},1,eliminatedracer,EliminatedRacer,Twitch,FFFFFFFF,0,0,0,1,15.000000,true\n`
+  return { summary, participants }
+}
+
+test('timesPlayed counts every race on the map, not just the one that set the record', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // "feel the fire", play #1
+
+  const slower = syntheticRace({
+    snapshotId: '66666666-6666-6666-6666-666666666666',
+    mapName: 'feel the fire',
+    winnerTime: 999, // slower — does not become the record, but is still a real play
+    winnerName: 'SlowRacer'
+  })
+  ingestRaceFromText(slower.summary, slower.participants) // play #2
+
+  const records = getMapRecords()
+  assert.equal(records.length, 1)
+  assert.equal(records[0]?.racerName, 'schoklad') // record unchanged
+  assert.equal(records[0]?.timesPlayed, 2) // but both plays counted
+})
+
+test('a race nobody finishes still counts as a play, even though it has no record to show on its own', () => {
+  const unfinished = syntheticUnfinishedRace({
+    snapshotId: '77777777-7777-7777-7777-777777777777',
+    mapName: 'nobody finishes this one'
+  })
+  ingestRaceFromText(unfinished.summary, unfinished.participants)
+
+  // No finisher anywhere yet on this map — nothing to show as a "record",
+  // so it correctly doesn't appear in the list at all.
+  assert.equal(getMapRecords().find((r) => r.mapName === 'nobody finishes this one'), undefined)
+
+  // A later race that DOES have a finisher makes the map appear — and
+  // timesPlayed must include the earlier no-finish attempt too, not just
+  // count from whenever the first real finish happened.
+  const finished = syntheticRace({
+    snapshotId: '88888888-8888-8888-8888-888888888888',
+    mapName: 'nobody finishes this one',
+    winnerTime: 60,
+    winnerName: 'FirstFinisher'
+  })
+  ingestRaceFromText(finished.summary, finished.participants)
+
+  const record = getMapRecords().find((r) => r.mapName === 'nobody finishes this one')
+  assert.equal(record?.racerName, 'FirstFinisher')
+  assert.equal(record?.timesPlayed, 2, 'the earlier all-eliminated attempt must still count as a play')
+})
+
+test('a manual override replaces the computed record and is flagged as such', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad, 133.391144s
+
+  setMapRecordOverride({ mapName: 'feel the fire', mapCreator: 'zim2325', racerName: 'NoahSays', timeSeconds: 42 })
+
+  const record = getMapRecords().find((r) => r.mapName === 'feel the fire')
+  assert.equal(record?.racerName, 'NoahSays')
+  assert.equal(record?.timeSeconds, 42)
+  assert.equal(record?.isManualOverride, true)
+  assert.equal(record?.timesPlayed, 1, 'timesPlayed reflects real captured plays regardless of the override')
+})
+
+test('a manual override can seed a record for a map with zero captured plays', () => {
+  setMapRecordOverride({ mapName: 'never actually played', mapCreator: 'SomeCreator', racerName: 'NoahSays', timeSeconds: 99 })
+
+  const record = getMapRecords().find((r) => r.mapName === 'never actually played')
+  assert.equal(record?.racerName, 'NoahSays')
+  assert.equal(record?.isManualOverride, true)
+  assert.equal(record?.timesPlayed, 0)
+})
+
+test('a manual override is NOT beaten by a subsequent faster real race — it stays locked until explicitly cleared', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad, 133.391144s
+  setMapRecordOverride({ mapName: 'feel the fire', mapCreator: 'zim2325', racerName: 'NoahSays', timeSeconds: 42 })
+
+  const evenFaster = syntheticRace({
+    snapshotId: '99999999-9999-9999-9999-999999999999',
+    mapName: 'feel the fire',
+    winnerTime: 10, // genuinely faster than the override's 42s
+    winnerName: 'GenuinelyFaster'
+  })
+  ingestRaceFromText(evenFaster.summary, evenFaster.participants)
+
+  const record = getMapRecords().find((r) => r.mapName === 'feel the fire')
+  assert.equal(record?.racerName, 'NoahSays', 'an override is a deliberate lock, not just a seed value a real time can beat')
+  assert.equal(record?.timeSeconds, 42)
+  assert.equal(record?.isManualOverride, true)
+})
+
+test('clearing an override reverts the map back to its automatically-computed record', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad, 133.391144s
+  setMapRecordOverride({ mapName: 'feel the fire', mapCreator: 'zim2325', racerName: 'NoahSays', timeSeconds: 42 })
+
+  clearMapRecordOverride('feel the fire', 'zim2325')
+
+  const record = getMapRecords().find((r) => r.mapName === 'feel the fire')
+  assert.equal(record?.racerName, 'schoklad')
+  assert.equal(record?.timeSeconds, 133.391144)
+  assert.equal(record?.isManualOverride, false)
+})
+
+test('clearing an override that was never set is a safe no-op', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  clearMapRecordOverride('feel the fire', 'zim2325') // never overridden
+
+  const record = getMapRecords().find((r) => r.mapName === 'feel the fire')
+  assert.equal(record?.racerName, 'schoklad') // untouched
+})
+
+test('setting a second override for the same map REPLACES the first rather than stacking', () => {
+  setMapRecordOverride({ mapName: 'feel the fire', mapCreator: 'zim2325', racerName: 'FirstGuess', timeSeconds: 50 })
+  setMapRecordOverride({ mapName: 'feel the fire', mapCreator: 'zim2325', racerName: 'CorrectedGuess', timeSeconds: 45 })
+
+  const records = getMapRecords().filter((r) => r.mapName === 'feel the fire')
+  assert.equal(records.length, 1)
+  assert.equal(records[0]?.racerName, 'CorrectedGuess')
+  assert.equal(records[0]?.timeSeconds, 45)
 })

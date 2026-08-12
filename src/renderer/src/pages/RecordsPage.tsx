@@ -2,7 +2,7 @@ import MapRecords from '../components/MapRecords'
 import { useMapRecords } from '../hooks/useMapRecords'
 
 export default function RecordsPage(): React.JSX.Element {
-  const { records, loading } = useMapRecords()
+  const { records, loading, refresh } = useMapRecords()
 
   return (
     <div>
@@ -10,7 +10,7 @@ export default function RecordsPage(): React.JSX.Element {
       {loading ? (
         <div style={{ color: 'var(--text-muted)' }}>Loading…</div>
       ) : (
-        <MapRecords records={records} />
+        <MapRecords records={records} onChanged={refresh} />
       )}
     </div>
   )

@@ -139,6 +139,10 @@ export interface MapRecord {
   racerName: string
   timeSeconds: number
   achievedAt: string
+  /** Real count of every captured race on this map, independent of whether anyone finished — never affected by a manual override. */
+  timesPlayed: number
+  /** True if racerName/timeSeconds/achievedAt came from Noah manually setting this record rather than the automatic best-time computation. */
+  isManualOverride: boolean
 }
 
 /** Normalized "most recent thing that happened" across Race/Tilt/Royale — powers the overlay's result toast. */

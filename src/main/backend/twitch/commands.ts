@@ -137,7 +137,8 @@ function ghostBalls(args: string): string {
   if (matches.length === 0) return `No Ghost Balls record found for "${args}".`
   if (matches.length === 1) {
     const m = matches[0]!
-    return `👻 ${m.mapName} (${m.mapCreator}): best time ${formatSeconds(m.timeSeconds)}, held by ${m.racerName}.`
+    const playCount = `played ${m.timesPlayed} time${m.timesPlayed === 1 ? '' : 's'}`
+    return `👻 ${m.mapName} (${m.mapCreator}): best time ${formatSeconds(m.timeSeconds)}, held by ${m.racerName} — ${playCount}.`
   }
 
   const names = matches

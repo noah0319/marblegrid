@@ -61,6 +61,32 @@
   font-weight: 600;
 }
 
+.map-records__played-ticker {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-card-hover);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.map-records__override-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(250, 178, 25, 0.16);
+  color: var(--status-warning);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
 .map-records__creator {
   font-weight: 400;
   font-size: 12px;
@@ -100,4 +126,61 @@
   text-align: center;
   color: var(--text-muted);
   padding: 32px 16px;
+}
+
+.map-records__edit-btn {
+  background: var(--surface-card-hover);
+  border: 1px solid var(--border-hairline-strong);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.map-records__edit-btn--save {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #0a0a0f;
+}
+
+.map-records__edit-row td {
+  background: var(--surface-card-active);
+  vertical-align: top;
+}
+
+.map-records__edit-fields {
+  display: flex;
+  gap: 8px;
+}
+
+.map-records__edit-input {
+  background: var(--surface-page);
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  width: 140px;
+}
+
+.map-records__edit-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.map-records__edit-error {
+  color: var(--status-critical);
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+.map-records__edit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
 }

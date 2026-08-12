@@ -115,7 +115,7 @@ test('!ghostballs with no argument gives a usage hint instead of guessing', () =
 test('!ghostballs finds the real map record by exact name, showing the creator for disambiguation', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
   const reply = handleChatCommand('!ghostballs feel the fire', ctx())
-  assert.match(reply ?? '', /^👻 feel the fire \(zim2325\): best time 2m 13\.4s, held by schoklad\.$/)
+  assert.match(reply ?? '', /^👻 feel the fire \(zim2325\): best time 2m 13\.4s, held by schoklad — played 1 time\.$/)
 })
 
 test('!ghostballs matches case-insensitively and by partial name', () => {

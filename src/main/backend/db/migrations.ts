@@ -168,5 +168,30 @@ CREATE TABLE chat_post_log (
   UNIQUE(event_kind, event_occurred_at)
 );
 `
+  },
+  {
+    // Lets Noah manually set (or correct) a map's Ghost Balls record instead
+    // of only ever accepting whatever the automatic best-time computation
+    // finds — see getMapRecords(). One row per (map_name, map_creator),
+    // same identity scheme as the computed records; setting a new override
+    // for a map that already has one replaces it (UPSERT), it doesn't stack.
+    //
+    // map_name/map_creator are COLLATE NOCASE at the COLUMN level (unlike
+    // the older race_events, where this is applied per-query instead) — a
+    // brand new table has no retrofit cost, and defining it here makes the
+    // UNIQUE constraint itself case-insensitive automatically, rather than
+    // relying on every query against this table to remember COLLATE NOCASE.
+    id: '003_map_record_overrides',
+    sql: `
+CREATE TABLE IF NOT EXISTS map_record_overrides (
+  id INTEGER PRIMARY KEY,
+  map_name TEXT NOT NULL COLLATE NOCASE,
+  map_creator TEXT NOT NULL COLLATE NOCASE,
+  racer_name TEXT NOT NULL,
+  time_seconds REAL NOT NULL,
+  set_at TEXT NOT NULL,
+  UNIQUE(map_name, map_creator)
+);
+`
   }
 ]

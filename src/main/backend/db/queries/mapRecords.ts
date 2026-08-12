@@ -1,6 +1,33 @@
 import { getDb } from '../db.ts'
 import type { MapRecord } from '../../../../shared/types.ts'
 
+interface ComputedRow {
+  mapName: string
+  mapCreator: string
+  racerName: string
+  timeSeconds: number
+  achievedAt: string
+}
+
+interface PlayCountRow {
+  mapName: string
+  mapCreator: string
+  timesPlayed: number
+}
+
+interface OverrideRow {
+  mapName: string
+  mapCreator: string
+  racerName: string
+  timeSeconds: number
+  achievedAt: string
+}
+
+/** Case-insensitive merge key — mirrors the COLLATE NOCASE matching already used throughout the SQL below. */
+function mapKey(mapName: string, mapCreator: string): string {
+  return `${mapName.toLowerCase()}::${mapCreator.toLowerCase()}`
+}
+
 /**
  * Best (lowest) finish time ever captured per map, all-time — not scoped to
  * a season, since a map record is about the map, not a season's standings.
@@ -29,10 +56,23 @@ import type { MapRecord } from '../../../../shared/types.ts'
  * aware of/expects a same-named map from someone else). Grouping by name
  * only would have silently merged two unrelated maps' times into one
  * record the instant that happened.
+ *
+ * Three sources merged in JS rather than one giant query:
+ * 1. Computed best times (as above).
+ * 2. Play counts — a SEPARATE, always-accurate tally of every race_event
+ *    per map, independent of whether anyone finished. Doing this apart from
+ *    (1) matters: a map attempted several times but never once finished
+ *    would otherwise be undercounted (or missing) if play count were
+ *    derived from the same finisher-only query as the best time.
+ * 3. Manual overrides (Noah's ask) — always win when present, for a map
+ *    with or without any real captured plays. timesPlayed still reflects
+ *    reality even when overridden; only the racer/time can be overridden,
+ *    not how many times it's actually been raced.
  */
 export function getMapRecords(): MapRecord[] {
   const db = getDb()
-  return db
+
+  const computed = db
     .prepare(
       `SELECT
          re.map_name as mapName,
@@ -54,8 +94,59 @@ export function getMapRecords(): MapRecord[] {
              AND re2.map_creator = re.map_creator COLLATE NOCASE
              AND rp2.eliminated = 0
          )
-       GROUP BY re.map_name COLLATE NOCASE, re.map_creator COLLATE NOCASE
-       ORDER BY re.map_name COLLATE NOCASE`
+       GROUP BY re.map_name COLLATE NOCASE, re.map_creator COLLATE NOCASE`
     )
-    .all() as unknown as MapRecord[]
+    .all() as unknown as ComputedRow[]
+
+  const playCounts = db
+    .prepare(
+      `SELECT map_name as mapName, map_creator as mapCreator, COUNT(DISTINCT id) as timesPlayed
+       FROM race_events
+       GROUP BY map_name COLLATE NOCASE, map_creator COLLATE NOCASE`
+    )
+    .all() as unknown as PlayCountRow[]
+
+  const overrides = db
+    .prepare(
+      `SELECT map_name as mapName, map_creator as mapCreator, racer_name as racerName,
+              time_seconds as timeSeconds, set_at as achievedAt
+       FROM map_record_overrides`
+    )
+    .all() as unknown as OverrideRow[]
+
+  const playCountByKey = new Map(playCounts.map((p) => [mapKey(p.mapName, p.mapCreator), p.timesPlayed]))
+
+  const byKey = new Map<string, MapRecord>()
+  for (const row of computed) {
+    const key = mapKey(row.mapName, row.mapCreator)
+    byKey.set(key, { ...row, timesPlayed: playCountByKey.get(key) ?? 0, isManualOverride: false })
+  }
+  for (const override of overrides) {
+    const key = mapKey(override.mapName, override.mapCreator)
+    byKey.set(key, { ...override, timesPlayed: playCountByKey.get(key) ?? 0, isManualOverride: true })
+  }
+
+  return [...byKey.values()].sort((a, b) => a.mapName.localeCompare(b.mapName))
+}
+
+/** Sets (or replaces) a manual override for a map — always wins over the computed record until cleared. */
+export function setMapRecordOverride(opts: {
+  mapName: string
+  mapCreator: string
+  racerName: string
+  timeSeconds: number
+}): void {
+  const db = getDb()
+  db.prepare(
+    `INSERT INTO map_record_overrides (map_name, map_creator, racer_name, time_seconds, set_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(map_name, map_creator) DO UPDATE SET
+       racer_name = excluded.racer_name, time_seconds = excluded.time_seconds, set_at = excluded.set_at`
+  ).run(opts.mapName, opts.mapCreator, opts.racerName, opts.timeSeconds, new Date().toISOString())
+}
+
+/** Reverts a map back to its automatically-computed record (a no-op if it was never overridden). */
+export function clearMapRecordOverride(mapName: string, mapCreator: string): void {
+  const db = getDb()
+  db.prepare(`DELETE FROM map_record_overrides WHERE map_name = ? AND map_creator = ?`).run(mapName, mapCreator)
 }

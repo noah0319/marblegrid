@@ -8,6 +8,8 @@ const BASE = `http://127.0.0.1:${SERVER_PORT}`
 interface MapRecordsState {
   records: MapRecord[]
   loading: boolean
+  /** Manual re-fetch — needed after setting/clearing an override, which isn't a race-event the WebSocket would otherwise push. */
+  refresh: () => Promise<void>
 }
 
 /**
@@ -39,5 +41,5 @@ export function useMapRecords(): MapRecordsState {
     )
   )
 
-  return { records, loading }
+  return { records, loading, refresh }
 }
