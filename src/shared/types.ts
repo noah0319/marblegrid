@@ -134,6 +134,8 @@ export interface LeaderboardRow {
 /** Best (lowest) finish time ever captured on a map, all-time — not season-scoped, see getMapRecords. */
 export interface MapRecord {
   mapName: string
+  /** Disambiguates same-named maps by different creators — see getMapRecords. */
+  mapCreator: string
   racerName: string
   timeSeconds: number
   achievedAt: string

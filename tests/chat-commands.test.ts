@@ -45,15 +45,17 @@ test('command matching is case-insensitive', () => {
   assert.ok(reply?.includes('schoklad'))
 })
 
-test('!mystats and !mymarble are true aliases — identical behavior', () => {
+test('!mystats, !mymarble, and !myballs are true aliases — identical behavior', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
-  // Different chatterId on each call so the second isn't just suppressed by
-  // the first's own per-user cooldown — this is testing alias equivalence,
-  // not cooldown behavior (that's covered separately below).
+  // Different chatterId on each call so a later one isn't just suppressed by
+  // an earlier one's own per-user cooldown — this is testing alias
+  // equivalence, not cooldown behavior (that's covered separately below).
   const a = handleChatCommand('!mystats', ctx({ chatterId: '1' }))
   const b = handleChatCommand('!mymarble', ctx({ chatterId: '2' }))
+  const c = handleChatCommand('!myballs', ctx({ chatterId: '3' }))
   assert.ok(a)
   assert.equal(a, b)
+  assert.equal(a, c)
 })
 
 test('!mystats reports real points and race count for today, using the real fixture', () => {
@@ -110,16 +112,22 @@ test('!ghostballs with no argument gives a usage hint instead of guessing', () =
   assert.equal(reply, 'Usage: !ghostballs <map name>')
 })
 
-test('!ghostballs finds the real map record by exact name', () => {
+test('!ghostballs finds the real map record by exact name, showing the creator for disambiguation', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
   const reply = handleChatCommand('!ghostballs feel the fire', ctx())
-  assert.match(reply ?? '', /^👻 feel the fire: 2m 13\.4s by schoklad\.$/)
+  assert.match(reply ?? '', /^👻 feel the fire \(zim2325\): best time 2m 13\.4s, held by schoklad\.$/)
 })
 
 test('!ghostballs matches case-insensitively and by partial name', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
   const reply = handleChatCommand('!ghostballs FIRE', ctx())
   assert.match(reply ?? '', /feel the fire/)
+})
+
+test('!ghostballs also matches by map CREATOR — a lookup for "everything by this person"', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const reply = handleChatCommand('!ghostballs zim2325', ctx())
+  assert.match(reply ?? '', /^👻 feel the fire \(zim2325\)/)
 })
 
 test('!ghostballs reports no match cleanly rather than an empty/broken reply', () => {

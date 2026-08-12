@@ -17,7 +17,14 @@ export default function MapRecords({ records }: MapRecordsProps): React.JSX.Elem
 
   const sorted = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const filtered = query ? records.filter((r) => r.mapName.toLowerCase().includes(query)) : records
+    // Matches creator too — same-named maps by different creators are a
+    // real, confirmed case, so "search by who made it" is a real lookup
+    // path, not just "search by map name".
+    const filtered = query
+      ? records.filter(
+          (r) => r.mapName.toLowerCase().includes(query) || r.mapCreator.toLowerCase().includes(query)
+        )
+      : records
     const copy = [...filtered]
     if (sortKey === 'mapName') return copy.sort((a, b) => a.mapName.localeCompare(b.mapName))
     if (sortKey === 'timeSeconds') return copy.sort((a, b) => a.timeSeconds - b.timeSeconds)
@@ -29,10 +36,10 @@ export default function MapRecords({ records }: MapRecordsProps): React.JSX.Elem
       <input
         type="text"
         className="map-records__search"
-        placeholder="Search maps…"
+        placeholder="Search maps or creators…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        aria-label="Search maps"
+        aria-label="Search maps or creators"
       />
       <div className="map-records">
         <table className="map-records__table">
@@ -54,8 +61,11 @@ export default function MapRecords({ records }: MapRecordsProps): React.JSX.Elem
           </thead>
           <tbody>
             {sorted.map((row) => (
-              <tr key={row.mapName}>
-                <td className="map-records__name">{row.mapName}</td>
+              <tr key={`${row.mapName}::${row.mapCreator}`}>
+                <td className="map-records__name">
+                  {row.mapName}
+                  <div className="map-records__creator">by {row.mapCreator}</div>
+                </td>
                 <td className="map-records__num map-records__num--time">{formatSeconds(row.timeSeconds)}</td>
                 <td className="map-records__num">{row.racerName}</td>
                 <td className="map-records__num">{dateFormatter.format(new Date(row.achievedAt))}</td>

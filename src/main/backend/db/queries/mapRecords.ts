@@ -22,6 +22,13 @@ import type { MapRecord } from '../../../../shared/types.ts'
  * .sav filenames — "season 55.sav" vs "Season 63.sav"), so if the same map
  * ever gets reported with different casing across two plays, it must still
  * be treated as one map, not silently split into two records.
+ *
+ * Identity is (map_name, map_creator) together, NOT map_name alone — per
+ * Noah directly: different creators can and do reuse the same map name
+ * (he confirmed a real one: "feel the fire" is by zim2325, implying he's
+ * aware of/expects a same-named map from someone else). Grouping by name
+ * only would have silently merged two unrelated maps' times into one
+ * record the instant that happened.
  */
 export function getMapRecords(): MapRecord[] {
   const db = getDb()
@@ -29,6 +36,7 @@ export function getMapRecords(): MapRecord[] {
     .prepare(
       `SELECT
          re.map_name as mapName,
+         re.map_creator as mapCreator,
          r.display_name as racerName,
          rp.time_in_race_seconds as timeSeconds,
          re.captured_at_local as achievedAt
@@ -42,9 +50,11 @@ export function getMapRecords(): MapRecord[] {
            SELECT MIN(rp2.time_in_race_seconds)
            FROM race_participants rp2
            JOIN race_events re2 ON re2.id = rp2.race_event_id
-           WHERE re2.map_name = re.map_name COLLATE NOCASE AND rp2.eliminated = 0
+           WHERE re2.map_name = re.map_name COLLATE NOCASE
+             AND re2.map_creator = re.map_creator COLLATE NOCASE
+             AND rp2.eliminated = 0
          )
-       GROUP BY re.map_name COLLATE NOCASE
+       GROUP BY re.map_name COLLATE NOCASE, re.map_creator COLLATE NOCASE
        ORDER BY re.map_name COLLATE NOCASE`
     )
     .all() as unknown as MapRecord[]

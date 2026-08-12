@@ -25,6 +25,7 @@ test("the real fastest FINISHER wins the record, not an eliminated racer's short
   const records = getMapRecords()
   assert.equal(records.length, 1)
   assert.equal(records[0]?.mapName, 'feel the fire')
+  assert.equal(records[0]?.mapCreator, 'zim2325')
   assert.equal(records[0]?.racerName, 'schoklad')
   assert.equal(records[0]?.timeSeconds, 133.391144)
   // The real fixture has several ELIMINATED racers with much shorter raw
@@ -41,12 +42,13 @@ test("the real fastest FINISHER wins the record, not an eliminated racer's short
 function syntheticRace(opts: {
   snapshotId: string
   mapName: string
+  mapCreator?: string
   winnerTime: number
   winnerName: string
 }): { summary: string; participants: string } {
   const summary =
     `SchemaVersion,SnapshotId,GeneratedAtUtc,Status,GameMode,SessionType,MapName,MapCreator,PlayerCount,FinishedCount,EliminatedCount,WinnerPlatform,WinnerUsername\n` +
-    `4,${opts.snapshotId},2026-08-10T16:59:03.229Z,Final,Custom Map Race,Qualifying,${opts.mapName},zim2325,1,1,0,Twitch,${opts.winnerName}\n`
+    `4,${opts.snapshotId},2026-08-10T16:59:03.229Z,Final,Custom Map Race,Qualifying,${opts.mapName},${opts.mapCreator ?? 'zim2325'},1,1,0,Twitch,${opts.winnerName}\n`
   const participants =
     `SnapshotId,Position,Username,DisplayName,Platform,NameColorHex,SeasonPointsEarned,SeasonPointsTotal,SeasonWinsTotal,SeasonMatchesPlayedTotal,TimeInRaceSeconds,Eliminated\n` +
     `${opts.snapshotId},1,${opts.winnerName.toLowerCase()},${opts.winnerName},Twitch,FFFFFFFF,4000,4000,1,1,${opts.winnerTime.toFixed(6)},false\n`
@@ -126,4 +128,34 @@ test('the same map reported with different capitalization across two plays is st
   assert.equal(records.length, 1, 'a differently-capitalized replay of the same map must not create a second row')
   assert.equal(records[0]?.racerName, 'FasterRacer') // 100s genuinely beats 133.39s
   assert.equal(records[0]?.timeSeconds, 100)
+})
+
+test('the same map NAME from a different CREATOR is a separate record, not merged — per Noah directly', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // "feel the fire" by zim2325, 133.391144s
+
+  // A real, confirmed risk (not hypothetical): different creators can and
+  // do reuse the same map name. A same-named map by someone ELSE must be
+  // tracked as its own record, even if its time would otherwise "beat" the
+  // other creator's map — they're not the same map just because the name
+  // matches.
+  const impostor = syntheticRace({
+    snapshotId: '55555555-5555-5555-5555-555555555555',
+    mapName: 'feel the fire',
+    mapCreator: 'SomeoneElse',
+    winnerTime: 50, // deliberately much faster — must NOT overwrite zim2325's record
+    winnerName: 'ImpostorRacer'
+  })
+  ingestRaceFromText(impostor.summary, impostor.participants)
+
+  const records = getMapRecords()
+  assert.equal(records.length, 2, 'same map name, different creator, must be two records, not one merged/overwritten record')
+
+  const zims = records.find((r) => r.mapCreator === 'zim2325')
+  const someoneElses = records.find((r) => r.mapCreator === 'SomeoneElse')
+  assert.equal(zims?.mapName, 'feel the fire')
+  assert.equal(zims?.racerName, 'schoklad')
+  assert.equal(zims?.timeSeconds, 133.391144, "zim2325's original record must be untouched by the other creator's faster time")
+  assert.equal(someoneElses?.mapName, 'feel the fire')
+  assert.equal(someoneElses?.racerName, 'ImpostorRacer')
+  assert.equal(someoneElses?.timeSeconds, 50)
 })

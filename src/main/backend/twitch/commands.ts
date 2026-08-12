@@ -24,11 +24,12 @@ interface CommandDef {
   handler: (args: string, ctx: ChatCommandContext) => string
 }
 
-// Aliases point at the same handler by design — !mystats and !mymarble are
-// meant to be interchangeable, not two different things.
+// Aliases point at the same handler by design — !mystats, !mymarble, and
+// !myballs are meant to be fully interchangeable, not different things.
 const COMMANDS: Record<string, CommandDef> = {
   '!mystats': { cooldownScope: 'user', cooldownMs: 10_000, handler: myStats },
   '!mymarble': { cooldownScope: 'user', cooldownMs: 10_000, handler: myStats },
+  '!myballs': { cooldownScope: 'user', cooldownMs: 10_000, handler: myStats },
   '!mywins': { cooldownScope: 'user', cooldownMs: 10_000, handler: myWins },
   '!top10today': { cooldownScope: 'global', cooldownMs: 15_000, handler: top10Today },
   '!top10season': { cooldownScope: 'global', cooldownMs: 15_000, handler: top10Season },
@@ -126,17 +127,22 @@ function ghostBalls(args: string): string {
   if (!args) return 'Usage: !ghostballs <map name>'
 
   const query = args.toLowerCase()
-  const matches = getMapRecords().filter((r) => r.mapName.toLowerCase().includes(query))
+  // Matches creator too — same-named maps by different creators are real
+  // (Noah confirmed one directly), so this doubles as "!ghostballs
+  // <creator>" to find everything by one map-maker.
+  const matches = getMapRecords().filter(
+    (r) => r.mapName.toLowerCase().includes(query) || r.mapCreator.toLowerCase().includes(query)
+  )
 
   if (matches.length === 0) return `No Ghost Balls record found for "${args}".`
   if (matches.length === 1) {
     const m = matches[0]!
-    return `👻 ${m.mapName}: ${formatSeconds(m.timeSeconds)} by ${m.racerName}.`
+    return `👻 ${m.mapName} (${m.mapCreator}): best time ${formatSeconds(m.timeSeconds)}, held by ${m.racerName}.`
   }
 
   const names = matches
     .slice(0, 5)
-    .map((m) => m.mapName)
+    .map((m) => `${m.mapName} (${m.mapCreator})`)
     .join(', ')
   const more = matches.length > 5 ? `, +${matches.length - 5} more` : ''
   return `Multiple maps match "${args}": ${names}${more} — try being more specific.`
