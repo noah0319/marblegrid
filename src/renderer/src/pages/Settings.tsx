@@ -355,10 +355,16 @@ export default function Settings(): React.JSX.Element {
             <ul className="settings__commands">
               <li>
                 <span className="settings__mono">!mystats</span>, <span className="settings__mono">!mymarble</span>, or{' '}
-                <span className="settings__mono">!myballs</span> — their own points and races today
+                <span className="settings__mono">!myballs</span> — today&apos;s points/races plus season points,
+                season races, and points-per-race (PPR)
               </li>
               <li>
-                <span className="settings__mono">!mywins</span> — their own wins this season
+                <span className="settings__mono">!mywins</span> — wins this season
+              </li>
+              <li>
+                Add <span className="settings__mono">@username</span> to either one (e.g.{' '}
+                <span className="settings__mono">!mystats @schoklad</span>) to look up someone else instead of
+                yourself
               </li>
               <li>
                 <span className="settings__mono">!top10today</span> — today&apos;s top 10
