@@ -145,6 +145,45 @@ export interface MapRecord {
   isManualOverride: boolean
 }
 
+/** A free-text note Noah's attached to a map — "notes" sub-category of Maps, his word: a coverall for whatever doesn't fit elsewhere. */
+export interface MapNote {
+  mapName: string
+  mapCreator: string
+  noteText: string
+  /** Null if no note has ever been saved for this map. */
+  updatedAt: string | null
+}
+
+/** Per-map engagement stats — "Community" sub-category of Maps. Race mode only, same scope as MapRecord. */
+export interface MapCommunityStat {
+  mapName: string
+  mapCreator: string
+  /** Every captured race on this map, finished or not — same count as MapRecord.timesPlayed. */
+  raceCount: number
+  /** SUM(eliminated_count) / SUM(player_count) across every race on the map, as a percentage. Participant-weighted, not an average of each race's own rate. */
+  deathRatePercent: number
+  /** Null if nobody has ever finished this map — genuinely no data, not zero/instant. */
+  avgFinishSeconds: number | null
+}
+
+/**
+ * One entry per time a map's record actually changed hands — "History"
+ * sub-category of Maps: "a history of when it was beaten and by who."
+ * Derived entirely from race data + overrides at query time, see
+ * getMapRecordHistory. previousTimeSeconds/previousRacerName are null when
+ * this is the first-ever recorded time for the map — nothing to beat yet.
+ */
+export interface MapHistoryEntry {
+  mapName: string
+  mapCreator: string
+  racerName: string
+  timeSeconds: number
+  achievedAt: string
+  previousTimeSeconds: number | null
+  previousRacerName: string | null
+  isManualOverride: boolean
+}
+
 /** Normalized "most recent thing that happened" across Race/Tilt/Royale — powers the overlay's result toast. */
 export interface LatestEventSummary {
   kind: 'race' | 'tilt' | 'royale'

@@ -1,4 +1,5 @@
 import { getDb } from '../db.ts'
+import { mapKey } from './mapKey.ts'
 import type { MapRecord } from '../../../../shared/types.ts'
 
 interface ComputedRow {
@@ -21,11 +22,6 @@ interface OverrideRow {
   racerName: string
   timeSeconds: number
   achievedAt: string
-}
-
-/** Case-insensitive merge key — mirrors the COLLATE NOCASE matching already used throughout the SQL below. */
-function mapKey(mapName: string, mapCreator: string): string {
-  return `${mapName.toLowerCase()}::${mapCreator.toLowerCase()}`
 }
 
 /**

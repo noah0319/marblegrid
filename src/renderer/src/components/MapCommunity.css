@@ -1,0 +1,106 @@
+.map-community__search {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 16px;
+  background: var(--surface-page);
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.map-community__search:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.map-community {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.map-community__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-community__table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-hairline);
+  white-space: nowrap;
+}
+
+.map-community__table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.map-community__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.map-community__table tbody tr:hover td {
+  background: var(--surface-card-hover);
+}
+
+.map-community__name {
+  font-weight: 600;
+}
+
+.map-community__creator {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.map-community__num {
+  color: var(--text-secondary);
+}
+
+.map-community__death-rate {
+  font-weight: 700;
+}
+
+.map-community__no-data {
+  color: var(--text-muted);
+}
+
+.map-community__sort {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.map-community__sort:hover {
+  color: var(--text-primary);
+}
+
+.map-community__sort--active {
+  color: var(--accent-primary);
+}
+
+.map-community__empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 32px 16px;
+}

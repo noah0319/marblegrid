@@ -193,5 +193,23 @@ CREATE TABLE IF NOT EXISTS map_record_overrides (
   UNIQUE(map_name, map_creator)
 );
 `
+  },
+  {
+    // "Maps" restructure — Noah's ask for a per-map "coverall" free-text note
+    // (his word), e.g. "shortcut near the start" or "chat loves this one".
+    // Saving blank text deletes the row instead of storing an empty note (see
+    // setMapNote) — no note and an empty note are the same thing here, so
+    // there's no reason to keep a row around for it.
+    id: '004_map_notes',
+    sql: `
+CREATE TABLE IF NOT EXISTS map_notes (
+  id INTEGER PRIMARY KEY,
+  map_name TEXT NOT NULL COLLATE NOCASE,
+  map_creator TEXT NOT NULL COLLATE NOCASE,
+  note_text TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(map_name, map_creator)
+);
+`
   }
 ]

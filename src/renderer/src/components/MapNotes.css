@@ -1,0 +1,108 @@
+.map-notes__search {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 16px;
+  background: var(--surface-page);
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.map-notes__search:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.map-notes__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.map-notes__card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+}
+
+.map-notes__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.map-notes__name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.map-notes__creator {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.map-notes__updated {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.map-notes__textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-page);
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.map-notes__textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.map-notes__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.map-notes__save-btn,
+.map-notes__cancel-btn {
+  background: var(--surface-card-hover);
+  border: 1px solid var(--border-hairline-strong);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.map-notes__save-btn {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #0a0a0f;
+}
+
+.map-notes__empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 32px 16px;
+}

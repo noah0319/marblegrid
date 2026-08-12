@@ -9,6 +9,9 @@ import { getOpenSeasonId } from './db/queries/seasons.ts'
 import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
 import { getLeaderboard } from './db/queries/leaderboard.ts'
 import { getMapRecords, setMapRecordOverride, clearMapRecordOverride } from './db/queries/mapRecords.ts'
+import { getMapNotes, setMapNote } from './db/queries/mapNotes.ts'
+import { getMapCommunityStats } from './db/queries/mapCommunity.ts'
+import { getMapRecordHistory } from './db/queries/mapHistory.ts'
 import { getLatestEvent } from './db/queries/latestEvent.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 import { getSettings, updateSettings } from './twitch/settingsStore.ts'
@@ -105,6 +108,27 @@ export async function startServer(port: number): Promise<void> {
     }
     clearMapRecordOverride(mapName, mapCreator)
     res.json({ ok: true })
+  })
+  // "Maps" sub-categories — Notes, Community, History. All read-derived from
+  // existing race_events/race_participants/map_record_overrides except Notes,
+  // which is the one genuinely new piece of state (map_notes table).
+  app.get('/api/map-notes', (_req, res) => {
+    res.json(getMapNotes())
+  })
+  app.post('/api/map-notes', (req, res) => {
+    const { mapName, mapCreator, noteText } = req.body as { mapName?: string; mapCreator?: string; noteText?: string }
+    if (!mapName || !mapCreator || typeof noteText !== 'string') {
+      res.status(400).json({ error: 'mapName, mapCreator, and noteText are all required' })
+      return
+    }
+    setMapNote({ mapName, mapCreator, noteText })
+    res.json({ ok: true })
+  })
+  app.get('/api/map-community', (_req, res) => {
+    res.json(getMapCommunityStats())
+  })
+  app.get('/api/map-history', (_req, res) => {
+    res.json(getMapRecordHistory())
   })
   app.get('/api/latest-event', (_req, res) => {
     res.json(getLatestEvent())

@@ -1,0 +1,29 @@
+.maps-page__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.maps-page__tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.maps-page__tab:hover {
+  color: var(--text-primary);
+}
+
+.maps-page__tab--active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+}

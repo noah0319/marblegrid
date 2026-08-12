@@ -97,22 +97,46 @@ async function takeShots(app) {
     console.log('WARNING: could not find Leaderboard nav button to click')
   }
 
-  // Ghost Balls (map records, renamed per Noah's request): click into the
-  // nav item and screenshot it too.
-  const clickedRecords = await page.evaluate(() => {
+  // Maps (renamed from the old flat "Ghost Balls" page, now tabbed: Ghost
+  // Ball / History / Notes / Community). Click into the nav item, then click
+  // through each tab and screenshot every one — the whole point of this
+  // restructure was the extra tabs, so each needs its own real render check,
+  // not just "the page opened."
+  const clickedMaps = await page.evaluate(() => {
     const buttons = [...document.querySelectorAll('button')]
-    const btn = buttons.find((b) => b.textContent?.trim() === 'Ghost Balls')
+    const btn = buttons.find((b) => b.textContent?.trim() === 'Maps')
     if (!btn) return false
     btn.click()
     return true
   })
-  if (clickedRecords) {
+  if (clickedMaps) {
     await page.waitForTimeout(800)
-    const recordsShot = path.join(OUT_DIR, '02c-records.png')
-    await page.screenshot({ path: recordsShot })
-    console.log('screenshot:', recordsShot)
+    await page.screenshot({ path: path.join(OUT_DIR, '02c-maps-ghostball.png') })
+    console.log('screenshot:', path.join(OUT_DIR, '02c-maps-ghostball.png'))
+
+    async function clickTabAndShoot(label, outName) {
+      const clickedTab = await page.evaluate((l) => {
+        const buttons = [...document.querySelectorAll('button')]
+        const btn = buttons.find((b) => b.textContent?.trim() === l)
+        if (!btn) return false
+        btn.click()
+        return true
+      }, label)
+      if (!clickedTab) {
+        console.log(`WARNING: could not find "${label}" tab button to click`)
+        return
+      }
+      await page.waitForTimeout(800)
+      const shot = path.join(OUT_DIR, outName)
+      await page.screenshot({ path: shot })
+      console.log('screenshot:', shot)
+    }
+
+    await clickTabAndShoot('History', '02d-maps-history.png')
+    await clickTabAndShoot('Notes', '02e-maps-notes.png')
+    await clickTabAndShoot('Community', '02f-maps-community.png')
   } else {
-    console.log('WARNING: could not find Ghost Balls nav button to click')
+    console.log('WARNING: could not find Maps nav button to click')
   }
 
   // Phase 5: Settings now has real Twitch-connect controls. Confirm the
