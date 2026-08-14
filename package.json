@@ -1,6 +1,6 @@
 {
   "name": "marblegrid",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Desktop companion app + OBS overlay for noonspins' Marbles on Stream races.",
   "author": "Noah",
   "private": true,
