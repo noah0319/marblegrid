@@ -1,7 +1,7 @@
 import express from 'express'
 import { createServer } from 'http'
 import { join } from 'path'
-import { shell } from 'electron'
+import { shell, app as electronApp } from 'electron'
 import { WebSocketServer } from 'ws'
 import { registerWss, broadcast } from './ws.ts'
 import { getDb } from './db/db.ts'
@@ -64,7 +64,10 @@ export async function startServer(port: number): Promise<void> {
   })
 
   app.get('/api/status', (_req, res) => {
-    res.json({ status: 'OK', app: 'MarbleGrid', phase: 5 })
+    // electronApp.getVersion() reads straight from package.json's "version"
+    // field as actually bundled — always accurate for both dev and packaged
+    // builds, unlike importing package.json directly.
+    res.json({ status: 'OK', app: 'MarbleGrid', phase: 5, version: electronApp.getVersion() })
   })
 
   // Real stats routes — Phase 2. Day-boundary hour is a hardcoded default for

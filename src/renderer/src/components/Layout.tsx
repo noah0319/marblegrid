@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useAppVersion } from '../hooks/useAppVersion'
 import './Layout.css'
 
 export type Page = 'dashboard' | 'leaderboard' | 'maps' | 'settings'
@@ -17,11 +18,14 @@ const NAV_ITEMS: { id: Page; label: string }[] = [
 ]
 
 export default function Layout({ page, onNavigate, children }: LayoutProps): React.JSX.Element {
+  const version = useAppVersion()
+
   return (
     <div className="layout">
       <nav className="layout__sidebar">
         <div className="layout__brand">
           <span className="layout__brand-mark">MARBLEGRID</span>
+          {version && <span className="layout__brand-version">v{version}</span>}
         </div>
         <ul className="layout__nav">
           {NAV_ITEMS.map((item) => (

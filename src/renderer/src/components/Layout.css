@@ -27,6 +27,15 @@
   text-shadow: 0 0 14px var(--accent-primary-glow);
 }
 
+.layout__brand-version {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
 .layout__nav {
   list-style: none;
   margin: 0;
