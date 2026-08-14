@@ -12,7 +12,7 @@ interface MapRecordsProps {
   onChanged: () => void
 }
 
-type SortKey = 'mapName' | 'timeSeconds' | 'achievedAt'
+type SortKey = 'mapName' | 'timesPlayed' | 'timeSeconds' | 'achievedAt'
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
@@ -60,6 +60,10 @@ export default function MapRecords({ records, onChanged }: MapRecordsProps): Rea
       : records
     const copy = [...filtered]
     if (sortKey === 'mapName') return copy.sort((a, b) => a.mapName.localeCompare(b.mapName))
+    // Most-played first, matching the Community tab's "most interesting
+    // extreme first" convention — same reasoning as Best Time sorting
+    // fastest-first rather than alphabetically-by-number.
+    if (sortKey === 'timesPlayed') return copy.sort((a, b) => b.timesPlayed - a.timesPlayed)
     if (sortKey === 'timeSeconds') return copy.sort((a, b) => a.timeSeconds - b.timeSeconds)
     return copy.sort((a, b) => (a.achievedAt < b.achievedAt ? 1 : -1))
   }, [records, sortKey, search])
@@ -100,6 +104,11 @@ export default function MapRecords({ records, onChanged }: MapRecordsProps): Rea
             <tr>
               <SortableHeader label="Map" active={sortKey === 'mapName'} onClick={() => setSortKey('mapName')} />
               <SortableHeader
+                label="Played"
+                active={sortKey === 'timesPlayed'}
+                onClick={() => setSortKey('timesPlayed')}
+              />
+              <SortableHeader
                 label="Best Time"
                 active={sortKey === 'timeSeconds'}
                 onClick={() => setSortKey('timeSeconds')}
@@ -128,10 +137,10 @@ export default function MapRecords({ records, onChanged }: MapRecordsProps): Rea
                 <tr key={key}>
                   <td className="map-records__name">
                     {row.mapName}
-                    <span className="map-records__played-ticker" title={`Played ${row.timesPlayed} time${row.timesPlayed === 1 ? '' : 's'}`}>
-                      ×{row.timesPlayed}
-                    </span>
                     <div className="map-records__creator">by {row.mapCreator}</div>
+                  </td>
+                  <td className="map-records__num" title={`Played ${row.timesPlayed} time${row.timesPlayed === 1 ? '' : 's'}`}>
+                    ×{row.timesPlayed}
                   </td>
                   <td className="map-records__num map-records__num--time">
                     {formatSeconds(row.timeSeconds)}
@@ -149,7 +158,7 @@ export default function MapRecords({ records, onChanged }: MapRecordsProps): Rea
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={5} className="map-records__empty">
+                <td colSpan={6} className="map-records__empty">
                   {records.length === 0
                     ? 'No finished races captured yet — records fill in as races on official maps complete.'
                     : `No maps match "${search.trim()}".`}
@@ -212,7 +221,7 @@ function EditRow({ row, onCancel, onSave, onResetToAutomatic }: EditRowProps): R
         {row.mapName}
         <div className="map-records__creator">by {row.mapCreator}</div>
       </td>
-      <td colSpan={3}>
+      <td colSpan={4}>
         <div className="map-records__edit-fields">
           <input
             type="text"

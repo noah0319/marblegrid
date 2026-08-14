@@ -139,6 +139,18 @@ export type WsMessage =
   | { type: 'tilt-event'; snapshotId: string }
   | { type: 'royale-event'; snapshotId: string }
   | { type: 'leaderboard-labels-changed' }
+  | ({ type: 'world-record-event' } & WorldRecordPayload)
+
+/** Broadcast the moment a world record is confirmed broken — see customMapPlayed.ts's diff-based detection. Purely a live push, no catch-up GET endpoint: missing the live moment means missing the celebration, same as any broadcast graphic, and the chat post still announces it either way. */
+export interface WorldRecordPayload {
+  mapName: string
+  mapCreator: string
+  recordHolderName: string
+  recordTimeSeconds: number
+  previousRecordTimeSeconds: number
+  previousRecordHolderName: string
+  pointsEarned: number | null
+}
 
 // --- API response shapes — single source of truth for backend (Phase 2) and
 // renderer/overlay (Phase 3/4), so the two never quietly drift apart. ---

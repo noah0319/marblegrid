@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { TwitchStatus } from '@shared/types'
 import { SERVER_PORT } from '@shared/constants'
+import { useAppSettings } from '../hooks/useAppSettings'
 import './Settings.css'
 
 const BASE = `http://127.0.0.1:${SERVER_PORT}`
@@ -29,6 +30,36 @@ export default function Settings(): React.JSX.Element {
   const [previewResult, setPreviewResult] = useState<PreviewPostResult | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [botConnecting, setBotConnecting] = useState(false)
+
+  const { settings: appSettings, loading: appSettingsLoading, refresh: refreshAppSettings } = useAppSettings()
+  const [toastSeconds, setToastSeconds] = useState('10')
+  const [toastSaving, setToastSaving] = useState(false)
+  const [toastSaved, setToastSaved] = useState(false)
+
+  // Local editable field only takes the fetched value once it actually
+  // arrives — otherwise it'd stomp whatever Noah's mid-typing the moment the
+  // fetch resolves.
+  useEffect(() => {
+    if (!appSettingsLoading) setToastSeconds(String(Math.round(appSettings.toastDurationMs / 1000)))
+  }, [appSettingsLoading, appSettings.toastDurationMs])
+
+  async function saveToastDuration(): Promise<void> {
+    const seconds = Number(toastSeconds)
+    if (!Number.isFinite(seconds) || seconds < 1 || seconds > 120) return
+    setToastSaving(true)
+    setToastSaved(false)
+    try {
+      await fetch(`${BASE}/api/app-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toastDurationMs: Math.round(seconds * 1000) })
+      })
+      await refreshAppSettings()
+      setToastSaved(true)
+    } finally {
+      setToastSaving(false)
+    }
+  }
 
   const refresh = useCallback(async () => {
     const res = await fetch(`${BASE}/api/twitch/status`)
@@ -383,6 +414,31 @@ export default function Settings(): React.JSX.Element {
             </ul>
           </>
         )}
+      </section>
+
+      <section className="settings__card">
+        <h2 className="settings__card-title">Overlay</h2>
+        <div className="settings__field">
+          <label htmlFor="toast-duration">Result toast on-screen time (seconds)</label>
+          <input
+            id="toast-duration"
+            type="number"
+            min={1}
+            max={120}
+            value={toastSeconds}
+            onChange={(e) => {
+              setToastSeconds(e.target.value)
+              setToastSaved(false)
+            }}
+          />
+        </div>
+        <button type="button" className="settings__btn" onClick={() => void saveToastDuration()} disabled={toastSaving}>
+          {toastSaving ? 'Saving…' : 'Save'}
+        </button>
+        {toastSaved && <p className="settings__hint">Saved — takes effect next time the overlay page loads.</p>}
+        <p className="settings__hint">
+          How long the race/Tilted/Royale result pop-in stays on screen in OBS before it hides again. 1–120 seconds.
+        </p>
       </section>
 
       <section className="settings__card">

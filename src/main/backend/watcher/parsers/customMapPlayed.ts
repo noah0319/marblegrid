@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { getDb } from '../../db/db.ts'
 import { MARBLES_SAVE_DIR } from '../paths.ts'
 import { maybePostWorldRecordToChat } from '../../twitch/chatPoster.ts'
+import { broadcast } from '../../ws.ts'
 
 const csvNumber = z.coerce.number()
 
@@ -105,6 +106,10 @@ export function ingestCustomMapPlayedFromText(text: string): WorldRecordBroken |
   }
 
   void maybePostWorldRecordToChat(broken)
+  // Noah's ask: a celebration on the OBS overlay too, not just chat. Purely
+  // a live push (see WorldRecordPayload's doc comment) — the overlay hook
+  // has no GET/catch-up counterpart the way race results do.
+  broadcast({ type: 'world-record-event', ...broken })
   return broken
 }
 

@@ -16,6 +16,7 @@ import { getMapRecordHistory } from './db/queries/mapHistory.ts'
 import { getLatestEvent } from './db/queries/latestEvent.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 import { getSettings, updateSettings } from './twitch/settingsStore.ts'
+import { getAppSettings, updateAppSettings } from './appSettingsStore.ts'
 import {
   getAuthorizeUrl,
   handleOAuthCallback,
@@ -134,6 +135,22 @@ export async function startServer(port: number): Promise<void> {
   app.get('/api/map-history', (_req, res) => {
     res.json(getMapRecordHistory())
   })
+  // General display preferences (currently just the overlay toast's
+  // on-screen duration — Noah's ask, was a hardcoded 10s constant).
+  // Separate from /api/twitch/* — these aren't Twitch-related at all.
+  app.get('/api/app-settings', (_req, res) => {
+    res.json(getAppSettings())
+  })
+  app.post('/api/app-settings', (req, res) => {
+    const { toastDurationMs } = req.body as { toastDurationMs?: number }
+    if (typeof toastDurationMs !== 'number' || !(toastDurationMs >= 1000) || !(toastDurationMs <= 120_000)) {
+      res.status(400).json({ error: 'toastDurationMs must be a number between 1000 and 120000 (1-120 seconds)' })
+      return
+    }
+    updateAppSettings({ toastDurationMs })
+    res.json({ ok: true })
+  })
+
   // Giveaway labels — Noah's ask: a blank spot per leaderboard rank (1-5) he
   // can type a prize into from the desktop app, shown on the OBS overlay
   // next to whoever's currently in that spot. Broadcasts so the overlay (a

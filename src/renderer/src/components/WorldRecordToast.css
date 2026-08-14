@@ -1,0 +1,87 @@
+.wr-toast {
+  position: fixed;
+  top: 32px;
+  right: 32px;
+  min-width: 320px;
+  max-width: 420px;
+  background: linear-gradient(160deg, rgba(28, 22, 4, 0.94), rgba(10, 10, 15, 0.94));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 2px solid var(--rank-gold);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  box-shadow:
+    0 0 44px rgba(232, 195, 74, 0.4),
+    0 8px 32px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.wr-toast__fireworks {
+  position: absolute;
+  top: 46px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.wr-toast__particle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.wr-toast__badge {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--rank-gold);
+  text-shadow: 0 0 14px rgba(232, 195, 74, 0.75);
+  margin-bottom: 10px;
+}
+
+.wr-toast__holder {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.wr-toast__map {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 4px 0 14px;
+}
+
+.wr-toast__time {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--rank-gold);
+  text-shadow: 0 0 18px rgba(232, 195, 74, 0.65);
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-toast__previous {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.wr-toast__previous strong {
+  color: var(--text-secondary);
+}
+
+.wr-toast__points {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-hairline);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--status-good);
+}
