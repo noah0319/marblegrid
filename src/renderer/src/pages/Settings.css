@@ -11,6 +11,7 @@
   padding: 24px;
   max-width: 560px;
   margin-bottom: 20px;
+  box-shadow: var(--shadow-card);
 }
 
 .settings__card-title {
@@ -104,6 +105,10 @@
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: #0a0a0f;
+}
+
+.settings__btn--accent:hover:not(:disabled) {
+  box-shadow: var(--shadow-glow-accent);
 }
 
 .settings__btn--ghost {

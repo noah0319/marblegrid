@@ -4,6 +4,7 @@
   border-radius: var(--radius-lg);
   padding: 20px 24px;
   max-width: 560px;
+  box-shadow: var(--shadow-card);
 }
 
 .leaderboard-labels__hint {
@@ -71,4 +72,8 @@
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: #0a0a0f;
+}
+
+.leaderboard-labels__save-btn:hover:not(:disabled) {
+  box-shadow: var(--shadow-glow-accent);
 }

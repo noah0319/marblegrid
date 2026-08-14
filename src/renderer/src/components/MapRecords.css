@@ -22,6 +22,7 @@
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 
 .map-records__table {
@@ -132,6 +133,14 @@
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: #0a0a0f;
+}
+
+.map-records__edit-btn:hover:not(:disabled) {
+  border-color: var(--border-hairline-strong);
+}
+
+.map-records__edit-btn--save:hover:not(:disabled) {
+  box-shadow: var(--shadow-glow-accent);
 }
 
 .map-records__edit-row td {

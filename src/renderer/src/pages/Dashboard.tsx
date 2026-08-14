@@ -42,10 +42,10 @@ export default function Dashboard(): React.JSX.Element {
         <div className="dashboard__loading">Loading stats…</div>
       ) : (
         <div className="dashboard__grid">
-          <StatTile label="Total Points" value={formatCompactNumber(stats.totalPoints)} accent />
+          <StatTile label="Total Points" value={formatCompactNumber(stats.totalPoints)} tone="accent" />
           <StatTile label="Avg Points" value={formatFullNumber(stats.avgPoints)} />
-          <StatTile label="Race HS" value={formatFullNumber(stats.raceHs)} />
-          <StatTile label="BR HS" value={formatFullNumber(stats.brHs)} />
+          <StatTile label="Race HS" value={formatFullNumber(stats.raceHs)} tone="race" />
+          <StatTile label="BR HS" value={formatFullNumber(stats.brHs)} tone="royale" />
         </div>
       )}
     </div>

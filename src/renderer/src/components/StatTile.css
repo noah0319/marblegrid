@@ -1,3 +1,14 @@
+@keyframes stat-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .stat-tile {
   background: var(--surface-card);
   border: 1px solid var(--border-hairline);
@@ -7,6 +18,18 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  box-shadow: var(--shadow-card);
+  animation: stat-tile-in var(--duration-slow) var(--ease-standard) both;
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
+}
+
+.stat-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-hairline-strong);
 }
 
 .stat-tile__label {
@@ -27,7 +50,32 @@
   font-variant-numeric: proportional-nums;
 }
 
+/* Tone modifiers — a colored top edge + a matching glow on the value, tied
+   to what each figure actually measures (dashboard__grid decides the order/
+   stagger; this file owns only the color-per-tone). */
+.stat-tile--accent {
+  border-top: 2px solid var(--accent-primary);
+}
+
 .stat-tile--accent .stat-tile__value {
   color: var(--accent-primary);
   text-shadow: 0 0 18px var(--accent-primary-glow);
+}
+
+.stat-tile--race {
+  border-top: 2px solid var(--mode-race);
+}
+
+.stat-tile--race .stat-tile__value {
+  color: var(--mode-race);
+  text-shadow: 0 0 18px var(--mode-race-glow);
+}
+
+.stat-tile--royale {
+  border-top: 2px solid var(--mode-royale);
+}
+
+.stat-tile--royale .stat-tile__value {
+  color: var(--mode-royale);
+  text-shadow: 0 0 18px var(--mode-royale-glow);
 }

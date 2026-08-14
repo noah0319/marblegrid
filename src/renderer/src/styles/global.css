@@ -27,6 +27,39 @@ a {
   color: inherit;
 }
 
+/* Baseline press/hover/focus feel for every button in the app — one rule
+   here beats redoing this per component (UI polish pass). Components that
+   set their own more-specific `transition` (e.g. .layout__nav-item) simply
+   layer on top; :active/:focus-visible still reach them since those states
+   aren't otherwise redefined. */
 button {
   font-family: inherit;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Respect the OS-level motion preference — the entrance/hover/spring motion
+   added in this pass collapses to near-instant instead of being forced on
+   anyone who's turned it off system-wide. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

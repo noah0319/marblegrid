@@ -29,17 +29,40 @@
   padding: 7px 16px;
   border-radius: 7px;
   cursor: pointer;
+  transition:
+    background var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard);
 }
 
 .dashboard__scope-btn--active {
   background: var(--surface-card-active);
   color: var(--accent-primary);
+  box-shadow: var(--shadow-card);
 }
 
 .dashboard__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+}
+
+/* Staggered mount-in — each tile owns the animation itself (StatTile.css),
+   this just offsets the start so they cascade left-to-right instead of
+   popping in together (UI polish pass: "more motion & life"). */
+.dashboard__grid > .stat-tile:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.dashboard__grid > .stat-tile:nth-child(2) {
+  animation-delay: 70ms;
+}
+
+.dashboard__grid > .stat-tile:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+.dashboard__grid > .stat-tile:nth-child(4) {
+  animation-delay: 210ms;
 }
 
 .dashboard__loading {

@@ -15,8 +15,8 @@
   padding: 10px 16px;
   cursor: pointer;
   transition:
-    color 120ms ease,
-    border-color 120ms ease;
+    color var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
 }
 
 .maps-page__tab:hover {
