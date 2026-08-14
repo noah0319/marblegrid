@@ -22,6 +22,16 @@ export interface OverlayLeaderboardState {
  * leaderboard-labels-changed WS push — this page is a separate browser
  * context (an OBS Browser Source) that could be open for hours, so an edit
  * made from the desktop app needs to reach it live, not just on next reload.
+ *
+ * Both refresh on 'hello' too, which the server sends on EVERY new
+ * connection, not just the first ever one. Real bug this fixes: the socket
+ * itself reconnects fine after the backend restarts (useLiveSocket's own
+ * retry timer), but reconnecting alone doesn't mean anything NEW happened —
+ * without this, the overlay stays frozen on whatever it fetched before the
+ * drop until a genuinely new race or label edit occurs, which on an
+ * unattended OBS source could be a long wait. Confirmed live: Noah's real
+ * overlay was showing stale points/standings from well before a restart
+ * while the backend's own data was already correct.
  */
 export function useOverlayLeaderboard(): OverlayLeaderboardState {
   const [rows, setRows] = useState<LeaderboardRow[]>([])
@@ -48,10 +58,15 @@ export function useOverlayLeaderboard(): OverlayLeaderboardState {
   useLiveSocket(
     useCallback(
       (msg) => {
-        if (msg.type === 'race-event' || msg.type === 'tilt-event' || msg.type === 'royale-event') {
+        if (
+          msg.type === 'race-event' ||
+          msg.type === 'tilt-event' ||
+          msg.type === 'royale-event' ||
+          msg.type === 'hello'
+        ) {
           void refreshRows()
         }
-        if (msg.type === 'leaderboard-labels-changed') {
+        if (msg.type === 'leaderboard-labels-changed' || msg.type === 'hello') {
           void refreshLabels()
         }
       },

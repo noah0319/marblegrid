@@ -207,8 +207,18 @@ async function takeShots(app) {
   await shootOverlay('http://127.0.0.1:43117/overlay-toast', '03a-overlay-toast-simulated.png')
 
   // Giveaway labels (Noah's ask): set a real one via the API, confirm it
-  // actually shows up on the live overlay, then clear it again so this
-  // verification run doesn't leave test data behind.
+  // actually shows up on the live overlay, then put back whatever was
+  // REALLY there before — never assume it was blank. A real incident:
+  // Noah had a genuine "NFT" label on rank 1 for an actual giveaway, and an
+  // earlier version of this script blindly cleared rank 1 to blank
+  // afterward instead of restoring it, wiping his real data. Read-then-
+  // restore, not set-then-blank.
+  const existingLabels = await page.evaluate(async () => {
+    const res = await fetch('http://127.0.0.1:43117/api/leaderboard-labels')
+    return res.json()
+  })
+  const originalRank1 = existingLabels.find((l) => l.rankPosition === 1)?.labelText ?? ''
+
   await page.evaluate(async () => {
     await fetch('http://127.0.0.1:43117/api/leaderboard-labels', {
       method: 'POST',
@@ -217,13 +227,14 @@ async function takeShots(app) {
     })
   })
   await shootOverlay('http://127.0.0.1:43117/overlay-leaderboard', '03b-overlay-leaderboard-simulated.png')
-  await page.evaluate(async () => {
+  await page.evaluate(async (restoreText) => {
     await fetch('http://127.0.0.1:43117/api/leaderboard-labels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rankPosition: 1, labelText: '' })
+      body: JSON.stringify({ rankPosition: 1, labelText: restoreText })
     })
-  })
+  }, originalRank1)
+  console.log(`restored rank 1 label to: "${originalRank1}"`)
 }
 
 main().catch((err) => {
