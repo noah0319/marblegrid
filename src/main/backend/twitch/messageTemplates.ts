@@ -1,5 +1,6 @@
 import type { LatestEventSummary } from '../../../shared/types.ts'
-import { formatFullNumber } from '../../../shared/format.ts'
+import type { WorldRecordBroken } from '../watcher/parsers/customMapPlayed.ts'
+import { formatFullNumber, formatSeconds } from '../../../shared/format.ts'
 
 const RESULTS_LABEL: Record<LatestEventSummary['kind'], string> = {
   race: 'Race Results',
@@ -27,9 +28,10 @@ const MAX_MESSAGE_LENGTH = 500
  */
 export function buildChatMessage(event: LatestEventSummary): string {
   const label = RESULTS_LABEL[event.kind]
-  // Race gets the map name, Tilt gets the level — Royale has neither concept.
-  const context = event.kind === 'race' || event.kind === 'tilt' ? ` (${event.label})` : ''
-  const header = `🏁 ${label}${context}:`
+  // Every kind has a real, meaningful label now: Race/Royale get the map
+  // name, Tilt gets the level. Royale didn't have a map concept until the
+  // 2026-08-13 game update — see getLatestEvent.
+  const header = `🏁 ${label} (${event.label}):`
 
   // allScorers can be empty even though a winner is still announced — eg. a
   // Tilt level nobody finishes, where every participant is at 0 points and
@@ -60,6 +62,22 @@ export function buildChatMessage(event: LatestEventSummary): string {
     message = build(shown)
   }
   return message
+}
+
+/**
+ * Deliberately more dramatic than buildChatMessage's normal race-result
+ * format — Noah's ask: "a big exciting message." Points are omitted
+ * entirely (not shown as "0" or missing) when no matching race could be
+ * cross-referenced — see customMapPlayed.ts's lookUpPointsForRecord.
+ */
+export function buildWorldRecordMessage(record: WorldRecordBroken): string {
+  const time = formatSeconds(record.recordTimeSeconds)
+  const previousTime = formatSeconds(record.previousRecordTimeSeconds)
+  const pointsPart = record.pointsEarned !== null ? ` (+${formatFullNumber(record.pointsEarned)} points!)` : ''
+  return (
+    `🌍💥 WORLD RECORD! ${record.recordHolderName} just SHATTERED the record on ${record.mapName} — ${time}!` +
+    ` (previous: ${previousTime}, held by ${record.previousRecordHolderName})${pointsPart} 🏆`
+  )
 }
 
 export const TEST_POST_MESSAGE = '[MarbleGrid test message — confirms chat posting works. Ignore.]'

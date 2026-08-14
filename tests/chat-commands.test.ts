@@ -160,10 +160,15 @@ test('!top10season lists real racers ranked by season points', () => {
   assert.match(reply ?? '', /^🏁 Top 10 this season: 1\. schoklad \(4,602\)/)
 })
 
-test('!racehs reports the real season Race HS', () => {
+test('!racehs reports the real season Race HS, who holds it, and which map it was scored on', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
   const reply = handleChatCommand('!racehs', ctx())
-  assert.equal(reply, '🏁 Season Race HS: 4,602 points.')
+  assert.equal(reply, '🏁 Season Race HS: 4,602 points — schoklad on feel the fire.')
+})
+
+test('!racehs is friendly when no race has been captured yet this season, not a fake zero', () => {
+  const reply = handleChatCommand('!racehs', ctx())
+  assert.equal(reply, '🏁 No races captured yet this season.')
 })
 
 test('!ghostballs with no argument gives a usage hint instead of guessing', () => {

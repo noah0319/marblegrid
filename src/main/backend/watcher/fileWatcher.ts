@@ -4,23 +4,26 @@ import { existsSync } from 'fs'
 import { captureRawSnapshot } from './rawCapture.ts'
 import { ingestRaceFiles } from './parsers/race.ts'
 import { ingestTiltFiles } from './parsers/tilt.ts'
-import { ingestRoyaleFile } from './parsers/royale.ts'
+import { ingestRoyaleFiles } from './parsers/royale.ts'
+import { ingestCustomMapPlayedFile } from './parsers/customMapPlayed.ts'
 import { handleSessionsFileAdded } from './seasonDetector.ts'
 import { MARBLES_SAVE_DIR, SESSIONS_DIR } from './paths.ts'
 
-const TYPED_FILES: Record<string, 'race' | 'tilt' | 'royale'> = {
+const TYPED_FILES: Record<string, 'race' | 'tilt' | 'royale' | 'customMap'> = {
   'LastSeasonRaceSummary.csv': 'race',
   'LastSeasonRace.csv': 'race',
   'LastTiltLevel.csv': 'tilt',
   'LastTiltLevelPlayers.csv': 'tilt',
-  'LastSeasonRoyale.csv': 'royale'
+  'LastSeasonRoyaleSummary.csv': 'royale',
+  'LastSeasonRoyale.csv': 'royale',
+  // World-record detection (Noah's ask) — see customMapPlayed.ts.
+  'LastCustomRaceMapPlayed.csv': 'customMap'
 }
 
-// Captured to the raw-snapshot safety net only — no typed table yet (see
-// 01 Architecture & Design). LastRaceNumbersHit.csv has never been observed
-// with real data; LastCustomRaceMapPlayed.csv and LastWatchedMarble.csv are
-// explicitly out of v1 scope.
-const RAW_ONLY_FILES = ['LastRaceNumbersHit.csv', 'LastCustomRaceMapPlayed.csv', 'LastWatchedMarble.csv']
+// Captured to the raw-snapshot safety net only — no typed table, and no
+// real data has ever been observed for LastRaceNumbersHit.csv to design one
+// against. LastWatchedMarble.csv is explicitly out of v1 scope.
+const RAW_ONLY_FILES = ['LastRaceNumbersHit.csv', 'LastWatchedMarble.csv']
 
 const ALL_WATCHED_FILENAMES = [...Object.keys(TYPED_FILES), ...RAW_ONLY_FILES]
 
@@ -115,7 +118,8 @@ async function handleFsEvent(filePath: string): Promise<void> {
     const kind = TYPED_FILES[fileName]
     if (kind === 'race') await ingestRaceFiles()
     else if (kind === 'tilt') await ingestTiltFiles()
-    else if (kind === 'royale') await ingestRoyaleFile()
+    else if (kind === 'royale') await ingestRoyaleFiles()
+    else if (kind === 'customMap') await ingestCustomMapPlayedFile()
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(`MarbleGrid: failed to process ${fileName}:`, err)

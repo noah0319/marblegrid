@@ -38,7 +38,7 @@ export function getSeasonStats(seasonId: number | null): RaceStats {
 
   const royaleRow = db
     .prepare(
-      `SELECT COALESCE(MAX(rp.points_earned), 0) as br_hs
+      `SELECT COALESCE(MAX(rp.season_points_earned), 0) as br_hs
        FROM royale_events re
        JOIN royale_participants rp ON rp.royale_event_id = re.id
        WHERE re.season_id IS ?`
@@ -67,7 +67,7 @@ export function getTodayStats(dayBoundaryHour: number, now: Date = new Date()): 
 
   const royaleRow = db
     .prepare(
-      `SELECT COALESCE(MAX(rp.points_earned), 0) as br_hs
+      `SELECT COALESCE(MAX(rp.season_points_earned), 0) as br_hs
        FROM royale_events re
        JOIN royale_participants rp ON rp.royale_event_id = re.id
        WHERE re.captured_at_local >= ? AND re.captured_at_local < ?`
@@ -75,6 +75,34 @@ export function getTodayStats(dayBoundaryHour: number, now: Date = new Date()): 
     .get(startUtc, endUtc) as unknown as RoyaleAggregateRow
 
   return toRaceStats(raceRow, royaleRow)
+}
+
+export interface SeasonRaceHighScore {
+  points: number
+  racerName: string
+  mapName: string
+}
+
+/**
+ * Who holds the season's Race HS, and which map it was scored on — powers
+ * !racehs (Noah's ask: the bare number alone wasn't enough context). Same
+ * season-scoping convention as getSeasonStats. Null if no race has been
+ * captured yet this season, rather than a fake zero-holder result.
+ */
+export function getSeasonRaceHighScore(seasonId: number | null): SeasonRaceHighScore | null {
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT r.display_name as racerName, rp.season_points_earned as points, re.map_name as mapName
+       FROM race_participants rp
+       JOIN race_events re ON re.id = rp.race_event_id
+       JOIN racers r ON r.id = rp.racer_id
+       WHERE re.season_id IS ?
+       ORDER BY rp.season_points_earned DESC
+       LIMIT 1`
+    )
+    .get(seasonId) as unknown as SeasonRaceHighScore | undefined
+  return row ?? null
 }
 
 function toRaceStats(raceRow: RaceAggregateRow, royaleRow: RoyaleAggregateRow): RaceStats {

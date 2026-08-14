@@ -35,8 +35,8 @@ export function getLatestEvent(): LatestEventSummary | null {
     .get() as { id: number; captured_at_local: string; level: number; top_tiltee_username: string } | undefined
 
   const royale = db
-    .prepare(`SELECT id, captured_at_local FROM royale_events ORDER BY captured_at_local DESC LIMIT 1`)
-    .get() as { id: number; captured_at_local: string } | undefined
+    .prepare(`SELECT id, captured_at_local, map_name FROM royale_events ORDER BY captured_at_local DESC LIMIT 1`)
+    .get() as { id: number; captured_at_local: string; map_name: string } | undefined
 
   const candidates: Candidate[] = []
   if (race) candidates.push({ kind: 'race', at: race.captured_at_local, id: race.id })
@@ -125,25 +125,27 @@ export function getLatestEvent(): LatestEventSummary | null {
 
   const topFinishers = db
     .prepare(
-      `SELECT r.display_name as name, rp.points_earned as points
+      `SELECT r.display_name as name, rp.season_points_earned as points
        FROM royale_participants rp JOIN racers r ON r.id = rp.racer_id
-       WHERE rp.royale_event_id = ? ORDER BY rp.points_earned DESC LIMIT 3`
+       WHERE rp.royale_event_id = ? ORDER BY rp.season_points_earned DESC LIMIT 3`
     )
     .all(winner.id) as unknown as { name: string; points: number }[]
 
   const allScorers = db
     .prepare(
-      `SELECT r.display_name as name, rp.points_earned as points
+      `SELECT r.display_name as name, rp.season_points_earned as points
        FROM royale_participants rp JOIN racers r ON r.id = rp.racer_id
-       WHERE rp.royale_event_id = ? AND rp.points_earned > 0
-       ORDER BY rp.points_earned DESC`
+       WHERE rp.royale_event_id = ? AND rp.season_points_earned > 0
+       ORDER BY rp.season_points_earned DESC`
     )
     .all(winner.id) as unknown as { name: string; points: number }[]
 
   return {
     kind: 'royale',
     occurredAt: royale!.captured_at_local,
-    label: 'Battle Royale',
+    // Real map name as of the 2026-08-13 schema update — Royale never had
+    // this concept before. Falls back for any pre-update row still on disk.
+    label: royale!.map_name || 'Battle Royale',
     allScorers,
     winnerName: topFinishers[0]?.name ?? '',
     winnerPoints: topFinishers[0]?.points ?? 0,

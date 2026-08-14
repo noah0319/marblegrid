@@ -5,9 +5,10 @@ import { join } from 'path'
 import { rmSync } from 'fs'
 import { initDb, closeDb, getDb } from '../src/main/backend/db/db.ts'
 import { initSettingsStore, updateSettings } from '../src/main/backend/twitch/settingsStore.ts'
-import { maybePostEventToChat, sendTestPost } from '../src/main/backend/twitch/chatPoster.ts'
-import { buildChatMessage } from '../src/main/backend/twitch/messageTemplates.ts'
+import { maybePostEventToChat, maybePostWorldRecordToChat, sendTestPost } from '../src/main/backend/twitch/chatPoster.ts'
+import { buildChatMessage, buildWorldRecordMessage } from '../src/main/backend/twitch/messageTemplates.ts'
 import type { LatestEventSummary } from '../src/shared/types.ts'
+import type { WorldRecordBroken } from '../src/main/backend/watcher/parsers/customMapPlayed.ts'
 
 let settingsPath: string
 
@@ -49,8 +50,10 @@ test('buildChatMessage formats each event kind distinctly, listing every scorer 
     '🏁 Tilted Results (Level 13): 🥇 #1: schoklad - 4,602 points | 🥈 #2: RahHerself - 4,234 points | 🥉 #3: Coryash - 3,866 points'
   )
   assert.equal(
-    buildChatMessage({ ...raceEvent, kind: 'royale', label: 'Battle Royale' }),
-    '🏁 Battle Royale Results: 🥇 #1: schoklad - 4,602 points | 🥈 #2: RahHerself - 4,234 points | 🥉 #3: Coryash - 3,866 points'
+    // Royale gained a real map name in the 2026-08-13 schema update — no
+    // longer the special case with no context at all.
+    buildChatMessage({ ...raceEvent, kind: 'royale', label: 'Roguelike Royale' }),
+    '🏁 Battle Royale Results (Roguelike Royale): 🥇 #1: schoklad - 4,602 points | 🥈 #2: RahHerself - 4,234 points | 🥉 #3: Coryash - 3,866 points'
   )
 })
 
@@ -200,4 +203,104 @@ test('sendTestPost fails clearly when nothing is connected', async () => {
   const result = await sendTestPost(async () => {})
   assert.equal(result.success, false)
   assert.match(result.error ?? '', /not connected/)
+})
+
+const worldRecord: WorldRecordBroken = {
+  mapName: 'speedway',
+  mapCreator: 'creator1',
+  recordHolderName: 'Bob',
+  recordTimeSeconds: 90,
+  previousRecordTimeSeconds: 100,
+  previousRecordHolderName: 'Alice',
+  pointsEarned: 777
+}
+
+test('buildWorldRecordMessage is distinctly more dramatic than a normal race result, and includes points when known', () => {
+  const message = buildWorldRecordMessage(worldRecord)
+  assert.match(message, /WORLD RECORD/)
+  assert.match(message, /Bob/)
+  assert.match(message, /speedway/)
+  assert.match(message, /1m 30\.0s/) // 90s formatted
+  assert.match(message, /previous: 1m 40\.0s/) // 100s formatted
+  assert.match(message, /Alice/)
+  assert.match(message, /\+777 points/)
+})
+
+test('buildWorldRecordMessage omits the points clause entirely when no matching race was found, not "0 points"', () => {
+  const message = buildWorldRecordMessage({ ...worldRecord, pointsEarned: null })
+  assert.doesNotMatch(message, /points/)
+})
+
+test('maybePostWorldRecordToChat does nothing when auto-post is off (the default)', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: false })
+  let calls = 0
+  const result = await maybePostWorldRecordToChat(worldRecord, async () => {
+    calls += 1
+  })
+  assert.equal(result.attempted, false)
+  assert.equal(calls, 0)
+})
+
+test('maybePostWorldRecordToChat sends and logs success when enabled and connected', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  const sent: { broadcasterId: string; message: string }[] = []
+  const result = await maybePostWorldRecordToChat(worldRecord, async (broadcasterId, message) => {
+    sent.push({ broadcasterId, message })
+  })
+
+  assert.equal(result.attempted, true)
+  assert.equal(result.success, true)
+  assert.equal(sent.length, 1)
+  assert.match(sent[0]?.message ?? '', /WORLD RECORD/)
+
+  const db = getDb()
+  const row = db
+    .prepare(`SELECT * FROM chat_post_log WHERE event_kind = 'world_record'`)
+    .get() as { success: number }
+  assert.equal(row.success, 1)
+})
+
+test('maybePostWorldRecordToChat never posts the exact same record twice (restart-safe dedupe)', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  let calls = 0
+  const sendFn = async (): Promise<void> => {
+    calls += 1
+  }
+
+  await maybePostWorldRecordToChat(worldRecord, sendFn)
+  const second = await maybePostWorldRecordToChat(worldRecord, sendFn)
+
+  assert.equal(calls, 1)
+  assert.equal(second.attempted, false)
+})
+
+test('maybePostWorldRecordToChat retries exactly once on failure, then gives up and logs', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  let calls = 0
+  const alwaysFails = async (): Promise<void> => {
+    calls += 1
+    throw new Error('simulated network failure')
+  }
+
+  const result = await maybePostWorldRecordToChat(worldRecord, alwaysFails)
+
+  assert.equal(calls, 2)
+  assert.equal(result.success, false)
+  assert.equal(result.error, 'simulated network failure')
+})
+
+test('a DIFFERENT world record (different map or time) is never blocked by an earlier record’s dedupe entry', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  let calls = 0
+  const sendFn = async (): Promise<void> => {
+    calls += 1
+  }
+
+  await maybePostWorldRecordToChat(worldRecord, sendFn)
+  const differentMap = await maybePostWorldRecordToChat({ ...worldRecord, mapName: 'skyline' }, sendFn)
+  const evenFasterOnSameMap = await maybePostWorldRecordToChat({ ...worldRecord, recordTimeSeconds: 80 }, sendFn)
+
+  assert.equal(calls, 3)
+  assert.equal(differentMap.attempted, true)
+  assert.equal(evenFasterOnSameMap.attempted, true)
 })

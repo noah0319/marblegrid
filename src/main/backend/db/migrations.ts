@@ -211,5 +211,107 @@ CREATE TABLE IF NOT EXISTS map_notes (
   UNIQUE(map_name, map_creator)
 );
 `
+  },
+  {
+    // Marbles on Stream updated Battle Royale's data format (confirmed via a
+    // real race captured 2026-08-12) to match Race/Tilt: a real summary file
+    // now exists (LastSeasonRoyaleSummary.csv, didn't before), participants
+    // have a SnapshotId and season point tracking, and there's a real map
+    // name. royale_events/royale_participants had ZERO real rows at the time
+    // of this migration (confirmed live) — the old content-hash-only schema
+    // never successfully recorded anything after the game update shipped, so
+    // a clean drop-and-recreate is safe, no data migration needed. Shape now
+    // mirrors race_events/race_participants exactly instead of being a
+    // one-off special case.
+    id: '005_royale_schema_update',
+    sql: `
+DROP TABLE IF EXISTS royale_participants;
+DROP TABLE IF EXISTS royale_events;
+
+CREATE TABLE royale_events (
+  id INTEGER PRIMARY KEY,
+  snapshot_id TEXT UNIQUE NOT NULL,
+  schema_version INTEGER,
+  generated_at_utc TEXT,
+  captured_at_local TEXT NOT NULL,
+  status TEXT,
+  game_mode TEXT,
+  session_type TEXT,
+  map_name TEXT,
+  map_creator TEXT,
+  player_count INTEGER,
+  finished_count INTEGER,
+  eliminated_count INTEGER,
+  winner_platform TEXT,
+  winner_username TEXT,
+  season_id INTEGER REFERENCES seasons(id),
+  raw_json TEXT NOT NULL
+);
+
+CREATE TABLE royale_participants (
+  id INTEGER PRIMARY KEY,
+  royale_event_id INTEGER NOT NULL REFERENCES royale_events(id),
+  racer_id INTEGER NOT NULL REFERENCES racers(id),
+  position INTEGER,
+  survival_time_seconds REAL,
+  eliminated INTEGER NOT NULL DEFAULT 0,
+  match_kills INTEGER,
+  match_damage_dealt INTEGER,
+  season_points_earned INTEGER,
+  season_points_total INTEGER,
+  season_wins_total INTEGER,
+  season_matches_played_total INTEGER,
+  UNIQUE(royale_event_id, racer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_royale_events_captured_at ON royale_events(captured_at_local);
+CREATE INDEX IF NOT EXISTS idx_royale_participants_racer ON royale_participants(racer_id);
+`
+  },
+  {
+    // Noah's ask: a blank spot on the OBS leaderboard overlay next to
+    // whoever's in a given position, that he can type into for giveaways
+    // (eg. "iPad" next to 1st place). Keyed by RANK POSITION (1-5), not by
+    // racer — a giveaway prize belongs to "whoever's in 1st", and should
+    // follow the position as standings shift, not stick to whichever
+    // specific person happened to be in 1st when Noah typed it. Saving blank
+    // text deletes the row, same "no label and an empty label are the same
+    // thing" reasoning as map_notes.
+    id: '006_leaderboard_labels',
+    sql: `
+CREATE TABLE IF NOT EXISTS leaderboard_labels (
+  rank_position INTEGER PRIMARY KEY,
+  label_text TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`
+  },
+  {
+    // Noah's ask: detect when a world record is broken on a custom map and
+    // post an exciting chat message. Source is LastCustomRaceMapPlayed.csv —
+    // a single overwritten snapshot (not a log) reflecting whichever custom
+    // map was most recently played. This table stores the last-known record
+    // MarbleGrid has observed per map, so a new snapshot can be DIFFED
+    // against it: genuinely faster than what's stored = a real record just
+    // broken. The first time any given map is ever seen there's nothing to
+    // diff against, so no alert fires — just the baseline gets stored (see
+    // customMapPlayed.ts) — same "don't alert on first sight" caution as the
+    // stale-catchup fix. Deliberately NOT season-scoped: a world record is a
+    // cross-season, cross-streamer concept, not tied to Noah's own season
+    // tracking the way Race HS is.
+    id: '007_custom_map_records',
+    sql: `
+CREATE TABLE IF NOT EXISTS custom_map_records (
+  id INTEGER PRIMARY KEY,
+  map_name TEXT NOT NULL COLLATE NOCASE,
+  map_creator TEXT NOT NULL COLLATE NOCASE,
+  record_time_seconds REAL NOT NULL,
+  record_holder_name TEXT NOT NULL,
+  date_set_raw TEXT,
+  first_seen_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(map_name, map_creator)
+);
+`
   }
 ]

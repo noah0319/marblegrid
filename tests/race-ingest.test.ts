@@ -107,26 +107,39 @@ test('ingests the real confirmed tilt sample', () => {
   assert.equal(playerCount.c, 8)
 })
 
-test('ingests the real confirmed royale sample despite its different schema (no SnapshotId/timestamp)', () => {
-  const royaleEventId = ingestRoyaleFromText(read('royale-sample.csv'))
+test('ingests the real confirmed royale sample — post 2026-08-13 schema update, matches Race/Tilt shape now', () => {
+  const royaleEventId = ingestRoyaleFromText(read('royale-summary-sample.csv'), read('royale-participants-sample.csv'))
   assert.notEqual(royaleEventId, null)
 
   const db = getDb()
+  const event = db.prepare('SELECT * FROM royale_events WHERE id = ?').get(royaleEventId) as Record<
+    string,
+    unknown
+  >
+  // The game update added a real map name/creator to Royale — didn't exist
+  // in the old schema at all.
+  assert.equal(event.map_name, 'Roguelike Royale')
+  assert.equal(event.map_creator, 'Pixel by Pixel Studios')
+  assert.equal(event.player_count, 29)
+  assert.equal(event.winner_username, 'duftin')
+
   const winner = db
     .prepare(
-      `SELECT rp.points_earned, rp.eliminated FROM royale_participants rp
+      `SELECT rp.season_points_earned, rp.eliminated FROM royale_participants rp
        JOIN racers r ON r.id = rp.racer_id
-       WHERE rp.royale_event_id = ? AND r.username = 'shaidarharan'`
+       WHERE rp.royale_event_id = ? AND r.username = 'duftin'`
     )
-    .get(royaleEventId) as { points_earned: number; eliminated: number }
-  assert.equal(winner.points_earned, 400)
+    .get(royaleEventId) as { season_points_earned: number; eliminated: number }
+  assert.equal(winner.season_points_earned, 252)
   assert.equal(winner.eliminated, 0)
 })
 
-test('ingesting the same royale content twice does not duplicate it (content-hash dedupe)', () => {
-  const text = read('royale-sample.csv')
-  const firstId = ingestRoyaleFromText(text)
-  const secondId = ingestRoyaleFromText(text)
+test('ingesting the same royale race twice does not duplicate it (SnapshotId dedupe, matches Race/Tilt now)', () => {
+  const summaryText = read('royale-summary-sample.csv')
+  const participantsText = read('royale-participants-sample.csv')
+
+  const firstId = ingestRoyaleFromText(summaryText, participantsText)
+  const secondId = ingestRoyaleFromText(summaryText, participantsText)
   assert.equal(firstId, secondId)
 
   const db = getDb()

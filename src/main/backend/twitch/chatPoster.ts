@@ -1,8 +1,9 @@
 import { getDb } from '../db/db.ts'
 import { getSettings } from './settingsStore.ts'
 import { getBroadcasterUserId, sendChatMessageAsConfigured } from './auth.ts'
-import { buildChatMessage, TEST_POST_MESSAGE } from './messageTemplates.ts'
+import { buildChatMessage, buildWorldRecordMessage, TEST_POST_MESSAGE } from './messageTemplates.ts'
 import type { LatestEventSummary } from '../../../shared/types.ts'
+import type { WorldRecordBroken } from '../watcher/parsers/customMapPlayed.ts'
 
 export interface ChatPostResult {
   attempted: boolean
@@ -83,6 +84,77 @@ async function sendWithRetry(
        ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
          attempted_at = excluded.attempted_at, success = 0, message = excluded.message, error = excluded.error`
     ).run(event.kind, event.occurredAt, new Date().toISOString(), message, errorMessage)
+    return { attempted: true, success: false, error: errorMessage }
+  }
+}
+
+/**
+ * Called after a world record is confirmed broken (see
+ * customMapPlayed.ts's diff-based detection — never fires on the first time
+ * a map is ever observed). Same auto-post gate, retry-once, and restart-safe
+ * dedupe policy as maybePostEventToChat, reusing the SAME chat_post_log
+ * table with a distinct event_kind rather than a parallel mechanism.
+ *
+ * Identity for dedupe is derived from the record itself
+ * (map+creator+time), not "now" — a world record has no natural
+ * occurredAt the way a race/tilt/royale event does (LastCustomRaceMapPlayed
+ * .csv is a snapshot, not a timestamped event), so this is the stable
+ * equivalent: the same genuine record value can only ever be inserted once.
+ */
+export async function maybePostWorldRecordToChat(
+  record: WorldRecordBroken,
+  sendFn: SendFn = defaultSend
+): Promise<ChatPostResult> {
+  const settings = getSettings()
+  if (!settings.autoPostEnabled) return { attempted: false, success: false }
+
+  const broadcasterId = getBroadcasterUserId()
+  if (!broadcasterId) return { attempted: false, success: false, error: 'Twitch is not connected' }
+
+  const identity = `${record.mapName.toLowerCase()}::${record.mapCreator.toLowerCase()}::${record.recordTimeSeconds}`
+
+  const db = getDb()
+  const alreadyPosted = db
+    .prepare(`SELECT 1 FROM chat_post_log WHERE event_kind = 'world_record' AND event_occurred_at = ? AND success = 1`)
+    .get(identity)
+  if (alreadyPosted) return { attempted: false, success: false }
+
+  return sendWorldRecordWithRetry(record, identity, broadcasterId, sendFn, 1)
+}
+
+async function sendWorldRecordWithRetry(
+  record: WorldRecordBroken,
+  identity: string,
+  broadcasterId: string,
+  sendFn: SendFn,
+  retriesLeft: number
+): Promise<ChatPostResult> {
+  const db = getDb()
+  const message = buildWorldRecordMessage(record)
+
+  try {
+    await sendFn(broadcasterId, message)
+    db.prepare(
+      `INSERT INTO chat_post_log (event_kind, event_occurred_at, attempted_at, success, message, error)
+       VALUES ('world_record', ?, ?, 1, ?, NULL)
+       ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
+         attempted_at = excluded.attempted_at, success = 1, message = excluded.message, error = NULL`
+    ).run(identity, new Date().toISOString(), message)
+    return { attempted: true, success: true, message }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+
+    if (retriesLeft > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      return sendWorldRecordWithRetry(record, identity, broadcasterId, sendFn, retriesLeft - 1)
+    }
+
+    db.prepare(
+      `INSERT INTO chat_post_log (event_kind, event_occurred_at, attempted_at, success, message, error)
+       VALUES ('world_record', ?, ?, 0, ?, ?)
+       ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
+         attempted_at = excluded.attempted_at, success = 0, message = excluded.message, error = excluded.error`
+    ).run(identity, new Date().toISOString(), message, errorMessage)
     return { attempted: true, success: false, error: errorMessage }
   }
 }

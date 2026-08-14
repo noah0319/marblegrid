@@ -48,6 +48,16 @@
   max-width: 140px;
 }
 
+.overlay-leaderboard__label {
+  color: var(--accent-primary);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  text-shadow: 0 0 8px var(--accent-primary-glow);
+}
+
 .overlay-leaderboard__points {
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;

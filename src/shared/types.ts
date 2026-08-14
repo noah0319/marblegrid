@@ -86,21 +86,48 @@ export const TiltParticipantSchema = z.object({
 })
 export type TiltParticipant = z.infer<typeof TiltParticipantSchema>
 
-// --- Battle Royale: LastSeasonRoyale.csv ---
-// Confirmed schema lacks SnapshotId/timestamp/SchemaVersion entirely, and has
-// no Platform column — a different, older shape than Race/Tilt. Re-verify
-// against 00 Game & Data Reference once Noah triggers a fresh Royale race;
-// this schema may have changed since the June sample this was built from.
+// --- Battle Royale: LastSeasonRoyaleSummary.csv + LastSeasonRoyale.csv ---
+// Schema confirmed CHANGED by a Marbles on Stream game update sometime
+// between the original June sample and 2026-08-12 (a real race captured
+// live on Noah's PC that day). The old shape (no SnapshotId, no summary
+// file, bare PointsEarned/Eliminations/DamageDealt, lowercase-d
+// "Displayname") is gone. Royale now matches Race/Tilt's shape exactly: a
+// real summary file (didn't exist before), SnapshotId, season point
+// tracking, and a real map name (Royale never had a "map" concept before).
+// See 07 Iteration Logs/(C) 2026-08-13 Royale schema update.md.
+
+export const RoyaleSummarySchema = z.object({
+  SchemaVersion: csvNumber,
+  SnapshotId: z.string().min(1),
+  GeneratedAtUtc: z.string(),
+  Status: z.string(),
+  GameMode: z.string(),
+  SessionType: z.string(),
+  MapName: z.string(),
+  MapCreator: z.string(),
+  PlayerCount: csvNumber,
+  FinishedCount: csvNumber,
+  EliminatedCount: csvNumber,
+  WinnerPlatform: z.string(),
+  WinnerUsername: z.string()
+})
+export type RoyaleSummary = z.infer<typeof RoyaleSummarySchema>
 
 export const RoyaleParticipantSchema = z.object({
+  SnapshotId: z.string().min(1),
   Position: csvNumber,
   Username: z.string().min(1),
-  Displayname: z.string(),
-  NameColor: z.string(),
-  PointsEarned: csvNumber,
+  DisplayName: z.string(),
+  Platform: z.string(),
+  NameColorHex: z.string(),
+  SurvivalTimeSeconds: csvNumber,
   Eliminated: csvBoolean,
-  Eliminations: csvNumber,
-  DamageDealt: csvNumber
+  MatchKills: csvNumber,
+  MatchDamageDealt: csvNumber,
+  SeasonPointsEarned: csvNumber,
+  SeasonPointsTotal: csvNumber,
+  SeasonWinsTotal: csvNumber,
+  SeasonMatchesPlayedTotal: csvNumber
 })
 export type RoyaleParticipant = z.infer<typeof RoyaleParticipantSchema>
 
@@ -110,7 +137,8 @@ export type WsMessage =
   | { type: 'hello'; message: string }
   | { type: 'race-event'; snapshotId: string }
   | { type: 'tilt-event'; snapshotId: string }
-  | { type: 'royale-event'; contentHash: string }
+  | { type: 'royale-event'; snapshotId: string }
+  | { type: 'leaderboard-labels-changed' }
 
 // --- API response shapes — single source of truth for backend (Phase 2) and
 // renderer/overlay (Phase 3/4), so the two never quietly drift apart. ---
@@ -182,6 +210,17 @@ export interface MapHistoryEntry {
   previousTimeSeconds: number | null
   previousRacerName: string | null
   isManualOverride: boolean
+}
+
+/**
+ * A giveaway label for one leaderboard rank position (1-5), shown on the OBS
+ * leaderboard overlay next to whoever currently holds that rank — Noah's
+ * ask, e.g. typing "iPad" next to 1st place. Keyed by position, not by
+ * racer, so it follows the rank as standings shift.
+ */
+export interface LeaderboardLabel {
+  rankPosition: number
+  labelText: string
 }
 
 /** Normalized "most recent thing that happened" across Race/Tilt/Royale — powers the overlay's result toast. */

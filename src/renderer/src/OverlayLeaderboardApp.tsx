@@ -7,6 +7,6 @@ import OverlayLeaderboard from './components/OverlayLeaderboard'
  * page.
  */
 export default function OverlayLeaderboardApp(): React.JSX.Element {
-  const rows = useOverlayLeaderboard()
-  return <OverlayLeaderboard rows={rows} />
+  const { rows, labels } = useOverlayLeaderboard()
+  return <OverlayLeaderboard rows={rows} labels={labels} />
 }

@@ -7,7 +7,7 @@ import {
 } from '../db/queries/racerStats.ts'
 import { getTodayLeaderboard, getLeaderboard } from '../db/queries/leaderboard.ts'
 import { getMapRecords } from '../db/queries/mapRecords.ts'
-import { getSeasonStats } from '../db/queries/stats.ts'
+import { getSeasonStats, getSeasonRaceHighScore } from '../db/queries/stats.ts'
 import { getOpenSeasonId } from '../db/queries/seasons.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../../shared/constants.ts'
 import { formatFullNumber, formatSeconds } from '../../../shared/format.ts'
@@ -156,8 +156,9 @@ function listWithBudget(prefix: string, rows: { displayName: string; username: s
 }
 
 function raceHs(): string {
-  const stats = getSeasonStats(getOpenSeasonId())
-  return `🏁 Season Race HS: ${formatFullNumber(stats.raceHs)} points.`
+  const hs = getSeasonRaceHighScore(getOpenSeasonId())
+  if (!hs) return '🏁 No races captured yet this season.'
+  return `🏁 Season Race HS: ${formatFullNumber(hs.points)} points — ${hs.racerName} on ${hs.mapName}.`
 }
 
 function ghostBalls(args: string): string {

@@ -3,13 +3,14 @@ import { createServer } from 'http'
 import { join } from 'path'
 import { shell } from 'electron'
 import { WebSocketServer } from 'ws'
-import { registerWss } from './ws.ts'
+import { registerWss, broadcast } from './ws.ts'
 import { getDb } from './db/db.ts'
 import { getOpenSeasonId } from './db/queries/seasons.ts'
 import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
 import { getLeaderboard } from './db/queries/leaderboard.ts'
 import { getMapRecords, setMapRecordOverride, clearMapRecordOverride } from './db/queries/mapRecords.ts'
 import { getMapNotes, setMapNote } from './db/queries/mapNotes.ts'
+import { getLeaderboardLabels, setLeaderboardLabel } from './db/queries/leaderboardLabels.ts'
 import { getMapCommunityStats } from './db/queries/mapCommunity.ts'
 import { getMapRecordHistory } from './db/queries/mapHistory.ts'
 import { getLatestEvent } from './db/queries/latestEvent.ts'
@@ -129,6 +130,24 @@ export async function startServer(port: number): Promise<void> {
   })
   app.get('/api/map-history', (_req, res) => {
     res.json(getMapRecordHistory())
+  })
+  // Giveaway labels — Noah's ask: a blank spot per leaderboard rank (1-5) he
+  // can type a prize into from the desktop app, shown on the OBS overlay
+  // next to whoever's currently in that spot. Broadcasts so the overlay (a
+  // separate browser context, possibly open for hours during a stream)
+  // updates live instead of needing a manual OBS refresh after every edit.
+  app.get('/api/leaderboard-labels', (_req, res) => {
+    res.json(getLeaderboardLabels())
+  })
+  app.post('/api/leaderboard-labels', (req, res) => {
+    const { rankPosition, labelText } = req.body as { rankPosition?: number; labelText?: string }
+    if (typeof rankPosition !== 'number' || rankPosition < 1 || rankPosition > 5 || typeof labelText !== 'string') {
+      res.status(400).json({ error: 'rankPosition (1-5) and labelText are required' })
+      return
+    }
+    setLeaderboardLabel(rankPosition, labelText)
+    broadcast({ type: 'leaderboard-labels-changed' })
+    res.json({ ok: true })
   })
   app.get('/api/latest-event', (_req, res) => {
     res.json(getLatestEvent())

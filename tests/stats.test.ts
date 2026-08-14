@@ -50,11 +50,11 @@ test('season stats scope correctly to an actual open season, not just the bootst
 
 test('BR HS reflects the highest single Royale points, independent of Race stats', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
-  ingestRoyaleFromText(read('royale-sample.csv'))
+  ingestRoyaleFromText(read('royale-summary-sample.csv'), read('royale-participants-sample.csv'))
 
   const stats = getSeasonStats(null)
   assert.equal(stats.raceHs, 4602)
-  assert.equal(stats.brHs, 400) // shaidarharan's win in the royale fixture
+  assert.equal(stats.brHs, 252) // duftin's win in the royale fixture
 })
 
 test('today stats include an event captured moments ago, at the default boundary hour', () => {

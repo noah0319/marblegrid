@@ -373,7 +373,8 @@ export default function Settings(): React.JSX.Element {
                 <span className="settings__mono">!top10season</span> — this season&apos;s top 10
               </li>
               <li>
-                <span className="settings__mono">!racehs</span> — the season&apos;s highest single-race score
+                <span className="settings__mono">!racehs</span> — the season&apos;s highest single-race score, who
+                holds it, and which map
               </li>
               <li>
                 <span className="settings__mono">!ghostballs &lt;map&gt;</span> — that map&apos;s best time and

@@ -93,6 +93,13 @@ async function takeShots(app) {
     const leaderboardShot = path.join(OUT_DIR, '02-leaderboard.png')
     await page.screenshot({ path: leaderboardShot })
     console.log('screenshot:', leaderboardShot)
+
+    // Full-page too: the real leaderboard now has 100+ rows, so the
+    // giveaway-labels card (Noah's ask) added below the table sits well
+    // below the fold in a normal viewport screenshot.
+    const leaderboardFullShot = path.join(OUT_DIR, '02-leaderboard-full.png')
+    await page.screenshot({ path: leaderboardFullShot, fullPage: true })
+    console.log('screenshot:', leaderboardFullShot)
   } else {
     console.log('WARNING: could not find Leaderboard nav button to click')
   }
@@ -198,7 +205,25 @@ async function takeShots(app) {
   }
 
   await shootOverlay('http://127.0.0.1:43117/overlay-toast', '03a-overlay-toast-simulated.png')
+
+  // Giveaway labels (Noah's ask): set a real one via the API, confirm it
+  // actually shows up on the live overlay, then clear it again so this
+  // verification run doesn't leave test data behind.
+  await page.evaluate(async () => {
+    await fetch('http://127.0.0.1:43117/api/leaderboard-labels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rankPosition: 1, labelText: 'iPad (test)' })
+    })
+  })
   await shootOverlay('http://127.0.0.1:43117/overlay-leaderboard', '03b-overlay-leaderboard-simulated.png')
+  await page.evaluate(async () => {
+    await fetch('http://127.0.0.1:43117/api/leaderboard-labels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rankPosition: 1, labelText: '' })
+    })
+  })
 }
 
 main().catch((err) => {
