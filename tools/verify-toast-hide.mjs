@@ -97,6 +97,16 @@ async function main() {
     console.log(stillVisible ? 'BUG REPRODUCED — toast is stuck visible' : 'FIX CONFIRMED — toast hid itself correctly despite the mid-display reconnect')
   } finally {
     await app.close().catch(() => {})
+    // Real incident (2026-08-14): app.close() resolving does NOT guarantee
+    // the underlying electron.exe process tree actually terminated — this
+    // exact script once left a zombie behind (worse than usual here, likely
+    // because the context.setOffline() cycle above put the app in a less
+    // graceful state to quit from), which kept running against Noah's real
+    // userData/port and left his OBS stuck showing /overlay-toast as a
+    // black page long after this script had "finished." Unconditional
+    // force-kill sweep after close(), not just a hope, so a hung close()
+    // can never strand a live process pointed at Noah's real app again.
+    killStaleInstances()
   }
 }
 

@@ -55,6 +55,13 @@ async function main() {
     // Always close, even on failure mid-script — an uncaught exception
     // between launch and here is exactly how last time's zombies happened.
     await app.close().catch(() => {})
+    // app.close() resolving does NOT guarantee the process tree actually
+    // terminated (confirmed again 2026-08-14 with verify-toast-hide.mjs's
+    // near-identical launch/close pattern — a hung close() left a zombie
+    // running against Noah's real userData/port, stuck showing an overlay
+    // page in place of his real app). Unconditional force-kill sweep after
+    // close(), every run, not just a hope.
+    killStaleInstances()
   }
   console.log('done')
 }
