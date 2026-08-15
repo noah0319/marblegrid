@@ -48,10 +48,18 @@
   gap: 16px;
 }
 
+/* Noah's ask: the old 1px/16%-opacity hairline (fine for desktop UI chrome)
+   read as too subtle once this is composited over gameplay video and run
+   through stream compression — viewers couldn't reliably tell where one
+   stat ended and the next began. Wider, much brighter, rounded caps and a
+   small vertical inset so it reads as a deliberate divider, not a stray
+   line, at a glance on stream. */
 .daily-stats-overlay__divider {
-  width: 1px;
+  width: 2px;
   align-self: stretch;
-  background: var(--border-hairline-strong);
+  margin: 2px 0;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .daily-stats-overlay__stat {
