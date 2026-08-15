@@ -163,6 +163,19 @@ export interface RaceStats {
   brHs: number
 }
 
+/**
+ * What /api/stats/today actually returns — RaceStats plus who holds today's
+ * Race HS / BR HS (Noah's ask for the Daily Stats overlay). Deliberately NOT
+ * folded into RaceStats itself: /api/stats/season returns plain RaceStats
+ * and doesn't compute holder names, so widening the shared type would make
+ * every RaceStats consumer look like it should have holder fields when only
+ * the today route actually provides them.
+ */
+export interface TodayStats extends RaceStats {
+  raceHsHolder: string | null
+  brHsHolder: string | null
+}
+
 export interface LeaderboardRow {
   username: string
   displayName: string

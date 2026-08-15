@@ -12,6 +12,13 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
+.daily-stats-overlay__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .daily-stats-overlay__title {
   font-size: 11px;
   font-weight: 800;
@@ -19,7 +26,20 @@
   text-transform: uppercase;
   color: var(--accent-primary);
   text-shadow: 0 0 10px var(--accent-primary-glow);
-  margin-bottom: 10px;
+}
+
+/* Preview mode (Noah's ask: check the overlay's look without real races) —
+   loud on purpose, same reasoning as the chat "test post" being clearly
+   marked: fake numbers must never be mistakable for a real stat on stream. */
+.daily-stats-overlay__preview-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--status-warning);
+  border: 1px solid var(--status-warning);
+  border-radius: 999px;
+  padding: 1px 8px;
 }
 
 .daily-stats-overlay__row {
@@ -65,4 +85,14 @@
 .daily-stats-overlay__stat-value--royale {
   color: var(--mode-royale);
   text-shadow: 0 0 10px var(--mode-royale-glow);
+}
+
+.daily-stats-overlay__stat-holder {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

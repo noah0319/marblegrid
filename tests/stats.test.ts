@@ -6,7 +6,12 @@ import { fileURLToPath } from 'url'
 import { initDb, closeDb } from '../src/main/backend/db/db.ts'
 import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
 import { ingestRoyaleFromText } from '../src/main/backend/watcher/parsers/royale.ts'
-import { getSeasonStats, getTodayStats } from '../src/main/backend/db/queries/stats.ts'
+import {
+  getSeasonStats,
+  getTodayStats,
+  getTodayRaceHighScore,
+  getTodayBrHighScore
+} from '../src/main/backend/db/queries/stats.ts'
 import { getLeaderboard } from '../src/main/backend/db/queries/leaderboard.ts'
 import { openSeasonFromFilename, getOpenSeasonId } from '../src/main/backend/db/queries/seasons.ts'
 import { DEFAULT_DAY_BOUNDARY_HOUR } from '../src/shared/constants.ts'
@@ -63,6 +68,26 @@ test('today stats include an event captured moments ago, at the default boundary
   const stats = getTodayStats(DEFAULT_DAY_BOUNDARY_HOUR)
   assert.equal(stats.totalCount, 1)
   assert.equal(stats.totalPoints, 32932)
+})
+
+test("getTodayRaceHighScore/getTodayBrHighScore name today's actual holders, not just the bare number", () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  ingestRoyaleFromText(read('royale-summary-sample.csv'), read('royale-participants-sample.csv'))
+
+  const raceHs = getTodayRaceHighScore(DEFAULT_DAY_BOUNDARY_HOUR)
+  assert.ok(raceHs)
+  assert.equal(raceHs?.racerName, 'schoklad')
+  assert.equal(raceHs?.points, 4602)
+
+  const brHs = getTodayBrHighScore(DEFAULT_DAY_BOUNDARY_HOUR)
+  assert.ok(brHs)
+  assert.equal(brHs?.racerName, 'duftin')
+  assert.equal(brHs?.points, 252)
+})
+
+test('getTodayRaceHighScore/getTodayBrHighScore return null when nothing has been captured today, not a fake zero-holder result', () => {
+  assert.equal(getTodayRaceHighScore(DEFAULT_DAY_BOUNDARY_HOUR), null)
+  assert.equal(getTodayBrHighScore(DEFAULT_DAY_BOUNDARY_HOUR), null)
 })
 
 test('leaderboard ranks racers by total points and tracks races played / wins', () => {

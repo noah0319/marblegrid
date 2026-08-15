@@ -105,6 +105,53 @@ export function getSeasonRaceHighScore(seasonId: number | null): SeasonRaceHighS
   return row ?? null
 }
 
+export interface DailyHighScore {
+  points: number
+  racerName: string
+}
+
+/**
+ * Who holds TODAY's Race HS / BR HS — Noah's ask, powers the Daily Stats
+ * overlay so a bare number isn't the only thing shown. Same
+ * getTodayBoundaryRangeUtc scoping as getTodayStats, and the same
+ * "racer_id -> racers.display_name" join pattern getSeasonRaceHighScore
+ * already uses for !racehs. Null if nothing's been captured yet today,
+ * rather than a fake zero-holder result.
+ */
+export function getTodayRaceHighScore(dayBoundaryHour: number, now: Date = new Date()): DailyHighScore | null {
+  const { startUtc, endUtc } = getTodayBoundaryRangeUtc(dayBoundaryHour, now)
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT r.display_name as racerName, rp.season_points_earned as points
+       FROM race_participants rp
+       JOIN race_events re ON re.id = rp.race_event_id
+       JOIN racers r ON r.id = rp.racer_id
+       WHERE re.captured_at_local >= ? AND re.captured_at_local < ?
+       ORDER BY rp.season_points_earned DESC
+       LIMIT 1`
+    )
+    .get(startUtc, endUtc) as unknown as DailyHighScore | undefined
+  return row ?? null
+}
+
+export function getTodayBrHighScore(dayBoundaryHour: number, now: Date = new Date()): DailyHighScore | null {
+  const { startUtc, endUtc } = getTodayBoundaryRangeUtc(dayBoundaryHour, now)
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT r.display_name as racerName, rp.season_points_earned as points
+       FROM royale_participants rp
+       JOIN royale_events re ON re.id = rp.royale_event_id
+       JOIN racers r ON r.id = rp.racer_id
+       WHERE re.captured_at_local >= ? AND re.captured_at_local < ?
+       ORDER BY rp.season_points_earned DESC
+       LIMIT 1`
+    )
+    .get(startUtc, endUtc) as unknown as DailyHighScore | undefined
+  return row ?? null
+}
+
 function toRaceStats(raceRow: RaceAggregateRow, royaleRow: RoyaleAggregateRow): RaceStats {
   return {
     totalPoints: raceRow.total_points,

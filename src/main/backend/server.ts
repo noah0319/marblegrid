@@ -6,7 +6,7 @@ import { WebSocketServer } from 'ws'
 import { registerWss, broadcast } from './ws.ts'
 import { getDb } from './db/db.ts'
 import { getOpenSeasonId } from './db/queries/seasons.ts'
-import { getSeasonStats, getTodayStats } from './db/queries/stats.ts'
+import { getSeasonStats, getTodayStats, getTodayRaceHighScore, getTodayBrHighScore } from './db/queries/stats.ts'
 import { getLeaderboard } from './db/queries/leaderboard.ts'
 import { getMapRecords, setMapRecordOverride, clearMapRecordOverride } from './db/queries/mapRecords.ts'
 import { getMapNotes, setMapNote } from './db/queries/mapNotes.ts'
@@ -31,7 +31,7 @@ import {
 import { sendTestPost } from './twitch/chatPoster.ts'
 import { buildChatMessage } from './twitch/messageTemplates.ts'
 import { startChatListener, stopChatListener, isChatListenerActive } from './twitch/chatListener.ts'
-import type { TwitchStatus } from '../../shared/types.ts'
+import type { TwitchStatus, TodayStats } from '../../shared/types.ts'
 
 /**
  * Local-only Express + WebSocket server. Binds to 127.0.0.1 only — this is a
@@ -77,7 +77,13 @@ export async function startServer(port: number): Promise<void> {
     res.json(getSeasonStats(getOpenSeasonId()))
   })
   app.get('/api/stats/today', (_req, res) => {
-    res.json(getTodayStats(getAppSettings().dayBoundaryHour))
+    const dayBoundaryHour = getAppSettings().dayBoundaryHour
+    const stats: TodayStats = {
+      ...getTodayStats(dayBoundaryHour),
+      raceHsHolder: getTodayRaceHighScore(dayBoundaryHour)?.racerName ?? null,
+      brHsHolder: getTodayBrHighScore(dayBoundaryHour)?.racerName ?? null
+    }
+    res.json(stats)
   })
   app.get('/api/leaderboard', (req, res) => {
     const limit = Number(req.query['limit']) || 20

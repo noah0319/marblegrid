@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { SERVER_PORT } from '@shared/constants'
-import type { RaceStats } from '@shared/types'
+import type { TodayStats } from '@shared/types'
 import { useLiveSocket } from './useLiveSocket'
 
 const BASE = `http://127.0.0.1:${SERVER_PORT}`
@@ -18,13 +18,13 @@ const BASE = `http://127.0.0.1:${SERVER_PORT}`
  * trigger keeps this from sitting frozen on stale numbers on an OBS source
  * left open for hours.
  */
-export function useTodayStats(): RaceStats | null {
-  const [stats, setStats] = useState<RaceStats | null>(null)
+export function useTodayStats(): TodayStats | null {
+  const [stats, setStats] = useState<TodayStats | null>(null)
 
   const refresh = useCallback(async () => {
     const res = await fetch(`${BASE}/api/stats/today`)
     if (!res.ok) return
-    setStats((await res.json()) as RaceStats)
+    setStats((await res.json()) as TodayStats)
   }, [])
 
   useEffect(() => {
