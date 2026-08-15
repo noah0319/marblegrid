@@ -41,7 +41,8 @@ export default defineConfig({
         input: {
           index: resolve('src/renderer/index.html'),
           'overlay-toast': resolve('src/renderer/overlay-toast.html'),
-          'overlay-leaderboard': resolve('src/renderer/overlay-leaderboard.html')
+          'overlay-leaderboard': resolve('src/renderer/overlay-leaderboard.html'),
+          'overlay-daily-stats': resolve('src/renderer/overlay-daily-stats.html')
         }
       }
     }

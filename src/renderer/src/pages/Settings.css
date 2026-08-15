@@ -63,7 +63,8 @@
   margin-bottom: 6px;
 }
 
-.settings__field input {
+.settings__field input,
+.settings__field select {
   width: 100%;
   background: var(--surface-page);
   border: 1px solid var(--border-hairline-strong);
@@ -74,7 +75,12 @@
   font-family: inherit;
 }
 
-.settings__field input:focus {
+.settings__field select {
+  cursor: pointer;
+}
+
+.settings__field input:focus,
+.settings__field select:focus {
   outline: none;
   border-color: var(--accent-primary);
 }

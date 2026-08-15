@@ -205,6 +205,7 @@ async function takeShots(app) {
   }
 
   await shootOverlay('http://127.0.0.1:43117/overlay-toast', '03a-overlay-toast-simulated.png')
+  await shootOverlay('http://127.0.0.1:43117/overlay-daily-stats', '03c-overlay-daily-stats-simulated.png')
 
   // Giveaway labels (Noah's ask): set a real one via the API, confirm it
   // actually shows up on the live overlay, then put back whatever was

@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { dirname } from 'path'
+import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 
 /**
  * General app/display preferences — deliberately separate from
@@ -11,10 +12,19 @@ import { dirname } from 'path'
 export interface AppSettings {
   /** How long the OBS result toast stays on screen before hiding — Noah's ask, was a hardcoded 10s constant. */
   toastDurationMs: number
+  /**
+   * Hour of day (0-23, local time) "today" rolls over at — Noah's ask, was
+   * the hardcoded DEFAULT_DAY_BOUNDARY_HOUR constant everywhere (getTodayStats,
+   * !mystats, !top10today, the Dashboard's Today toggle). Lets a streamer
+   * whose day runs late (e.g. 10am-8pm) set their own reset point (e.g. 9pm)
+   * instead of the default 6am splitting a still-live stream in two.
+   */
+  dayBoundaryHour: number
 }
 
 const DEFAULTS: AppSettings = {
-  toastDurationMs: 10_000
+  toastDurationMs: 10_000,
+  dayBoundaryHour: DEFAULT_DAY_BOUNDARY_HOUR
 }
 
 let settingsPath: string | null = null

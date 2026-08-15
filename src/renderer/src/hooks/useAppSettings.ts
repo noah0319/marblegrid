@@ -5,9 +5,10 @@ const BASE = `http://127.0.0.1:${SERVER_PORT}`
 
 export interface AppSettings {
   toastDurationMs: number
+  dayBoundaryHour: number
 }
 
-const DEFAULTS: AppSettings = { toastDurationMs: 10_000 }
+const DEFAULTS: AppSettings = { toastDurationMs: 10_000, dayBoundaryHour: 6 }
 
 interface AppSettingsState {
   settings: AppSettings
@@ -15,7 +16,7 @@ interface AppSettingsState {
   refresh: () => Promise<void>
 }
 
-/** General display preferences (currently just toastDurationMs) — separate from Twitch connection settings. */
+/** General display preferences (toast duration, day-boundary hour) — separate from Twitch connection settings. */
 export function useAppSettings(): AppSettingsState {
   const [settings, setSettings] = useState<AppSettings>(DEFAULTS)
   const [loading, setLoading] = useState(true)

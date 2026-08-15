@@ -35,6 +35,9 @@ export default function Settings(): React.JSX.Element {
   const [toastSeconds, setToastSeconds] = useState('10')
   const [toastSaving, setToastSaving] = useState(false)
   const [toastSaved, setToastSaved] = useState(false)
+  const [boundaryHour, setBoundaryHour] = useState('6')
+  const [boundarySaving, setBoundarySaving] = useState(false)
+  const [boundarySaved, setBoundarySaved] = useState(false)
 
   // Local editable field only takes the fetched value once it actually
   // arrives — otherwise it'd stomp whatever Noah's mid-typing the moment the
@@ -42,6 +45,10 @@ export default function Settings(): React.JSX.Element {
   useEffect(() => {
     if (!appSettingsLoading) setToastSeconds(String(Math.round(appSettings.toastDurationMs / 1000)))
   }, [appSettingsLoading, appSettings.toastDurationMs])
+
+  useEffect(() => {
+    if (!appSettingsLoading) setBoundaryHour(String(appSettings.dayBoundaryHour))
+  }, [appSettingsLoading, appSettings.dayBoundaryHour])
 
   async function saveToastDuration(): Promise<void> {
     const seconds = Number(toastSeconds)
@@ -58,6 +65,30 @@ export default function Settings(): React.JSX.Element {
       setToastSaved(true)
     } finally {
       setToastSaving(false)
+    }
+  }
+
+  // Noah's ask: someone whose stream runs late (e.g. 10am-8pm) can move the
+  // "today" reset point to something like 9pm instead of the default 6am
+  // splitting a still-live stream into two days. Feeds getTodayStats, the
+  // Dashboard's Today toggle, !mystats, and !top10today — one setting, every
+  // consumer picks it up live (all read fresh from appSettingsStore per
+  // request, nothing caches the old value).
+  async function saveDayBoundaryHour(): Promise<void> {
+    const hour = Number(boundaryHour)
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) return
+    setBoundarySaving(true)
+    setBoundarySaved(false)
+    try {
+      await fetch(`${BASE}/api/app-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dayBoundaryHour: hour })
+      })
+      await refreshAppSettings()
+      setBoundarySaved(true)
+    } finally {
+      setBoundarySaving(false)
     }
   }
 
@@ -443,10 +474,41 @@ export default function Settings(): React.JSX.Element {
 
       <section className="settings__card">
         <h2 className="settings__card-title">Stats</h2>
+        <div className="settings__field">
+          <label htmlFor="day-boundary">&quot;Today&quot; resets at</label>
+          <select
+            id="day-boundary"
+            value={boundaryHour}
+            onChange={(e) => {
+              setBoundaryHour(e.target.value)
+              setBoundarySaved(false)
+            }}
+          >
+            {HOUR_OPTIONS.map((hour) => (
+              <option key={hour} value={hour}>
+                {formatHourLabel(hour)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="button" className="settings__btn" onClick={() => void saveDayBoundaryHour()} disabled={boundarySaving}>
+          {boundarySaving ? 'Saving…' : 'Save'}
+        </button>
+        {boundarySaved && <p className="settings__hint">Saved — Dashboard, chat commands, and the daily-stats overlay all switch over immediately.</p>}
         <p className="settings__hint">
-          Day-boundary hour for &quot;Today&quot; stats: <strong>6:00 AM</strong> (fixed for now).
+          Controls where &quot;Today&quot; splits from &quot;yesterday&quot; — matters if your stream runs past
+          midnight or you just prefer a different cutoff (e.g. 9 PM if you typically stream 10am–8pm). Default is
+          6:00 AM.
         </p>
       </section>
     </div>
   )
+}
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => hour)
+
+function formatHourLabel(hour: number): string {
+  const period = hour < 12 ? 'AM' : 'PM'
+  const twelveHour = hour % 12 === 0 ? 12 : hour % 12
+  return `${twelveHour}:00 ${period}`
 }

@@ -9,7 +9,7 @@ import { getTodayLeaderboard, getLeaderboard } from '../db/queries/leaderboard.t
 import { getMapRecords } from '../db/queries/mapRecords.ts'
 import { getSeasonStats, getSeasonRaceHighScore } from '../db/queries/stats.ts'
 import { getOpenSeasonId } from '../db/queries/seasons.ts'
-import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../../shared/constants.ts'
+import { getAppSettings } from '../appSettingsStore.ts'
 import { formatFullNumber, formatSeconds } from '../../../shared/format.ts'
 
 // Twitch caps chat messages at 500 characters — same constraint buildChatMessage
@@ -106,7 +106,7 @@ function myStats(args: string, ctx: ChatCommandContext): string {
   if (!racerHasEverRaced(target.username)) {
     return `@${target.displayName} hasn't raced yet — hop in with !play!`
   }
-  const today = getRacerTodayStats(target.username, DEFAULT_DAY_BOUNDARY_HOUR, ctx.now)
+  const today = getRacerTodayStats(target.username, getAppSettings().dayBoundaryHour, ctx.now)
   const season = getRacerSeasonStats(target.username, getOpenSeasonId())
   const todayRaceWord = today.racesPlayed === 1 ? 'race' : 'races'
   const seasonRaceWord = season.racesPlayed === 1 ? 'race' : 'races'
@@ -128,7 +128,7 @@ function myWins(args: string, ctx: ChatCommandContext): string {
 }
 
 function top10Today(): string {
-  const rows = getTodayLeaderboard(DEFAULT_DAY_BOUNDARY_HOUR, 10)
+  const rows = getTodayLeaderboard(getAppSettings().dayBoundaryHour, 10)
   if (rows.length === 0) return 'No races captured yet today.'
   return listWithBudget('🏁 Top 10 today: ', rows)
 }

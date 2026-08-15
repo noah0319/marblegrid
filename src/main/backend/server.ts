@@ -14,7 +14,6 @@ import { getLeaderboardLabels, setLeaderboardLabel } from './db/queries/leaderbo
 import { getMapCommunityStats } from './db/queries/mapCommunity.ts'
 import { getMapRecordHistory } from './db/queries/mapHistory.ts'
 import { getLatestEvent } from './db/queries/latestEvent.ts'
-import { DEFAULT_DAY_BOUNDARY_HOUR } from '../../shared/constants.ts'
 import { getSettings, updateSettings } from './twitch/settingsStore.ts'
 import { getAppSettings, updateAppSettings } from './appSettingsStore.ts'
 import {
@@ -71,13 +70,14 @@ export async function startServer(port: number): Promise<void> {
     res.json({ status: 'OK', app: 'MarbleGrid', phase: 5, version: electronApp.getVersion() })
   })
 
-  // Real stats routes — Phase 2. Day-boundary hour is a hardcoded default for
-  // now; Phase 3's Settings screen makes it a real per-user override.
+  // Real stats routes — Phase 2. Day-boundary hour is now a real per-user
+  // override (Noah's ask), read fresh on every request from appSettingsStore
+  // rather than the old hardcoded DEFAULT_DAY_BOUNDARY_HOUR constant.
   app.get('/api/stats/season', (_req, res) => {
     res.json(getSeasonStats(getOpenSeasonId()))
   })
   app.get('/api/stats/today', (_req, res) => {
-    res.json(getTodayStats(DEFAULT_DAY_BOUNDARY_HOUR))
+    res.json(getTodayStats(getAppSettings().dayBoundaryHour))
   })
   app.get('/api/leaderboard', (req, res) => {
     const limit = Number(req.query['limit']) || 20
@@ -135,19 +135,30 @@ export async function startServer(port: number): Promise<void> {
   app.get('/api/map-history', (_req, res) => {
     res.json(getMapRecordHistory())
   })
-  // General display preferences (currently just the overlay toast's
-  // on-screen duration — Noah's ask, was a hardcoded 10s constant).
-  // Separate from /api/twitch/* — these aren't Twitch-related at all.
+  // General display preferences (overlay toast duration, day-boundary hour —
+  // both were hardcoded constants before, both Noah's ask to make real
+  // per-user settings). Separate from /api/twitch/* — not Twitch-related.
   app.get('/api/app-settings', (_req, res) => {
     res.json(getAppSettings())
   })
   app.post('/api/app-settings', (req, res) => {
-    const { toastDurationMs } = req.body as { toastDurationMs?: number }
-    if (typeof toastDurationMs !== 'number' || !(toastDurationMs >= 1000) || !(toastDurationMs <= 120_000)) {
-      res.status(400).json({ error: 'toastDurationMs must be a number between 1000 and 120000 (1-120 seconds)' })
-      return
+    const { toastDurationMs, dayBoundaryHour } = req.body as { toastDurationMs?: number; dayBoundaryHour?: number }
+    const patch: { toastDurationMs?: number; dayBoundaryHour?: number } = {}
+    if (toastDurationMs !== undefined) {
+      if (typeof toastDurationMs !== 'number' || !(toastDurationMs >= 1000) || !(toastDurationMs <= 120_000)) {
+        res.status(400).json({ error: 'toastDurationMs must be a number between 1000 and 120000 (1-120 seconds)' })
+        return
+      }
+      patch.toastDurationMs = toastDurationMs
     }
-    updateAppSettings({ toastDurationMs })
+    if (dayBoundaryHour !== undefined) {
+      if (typeof dayBoundaryHour !== 'number' || !Number.isInteger(dayBoundaryHour) || dayBoundaryHour < 0 || dayBoundaryHour > 23) {
+        res.status(400).json({ error: 'dayBoundaryHour must be a whole number between 0 and 23' })
+        return
+      }
+      patch.dayBoundaryHour = dayBoundaryHour
+    }
+    updateAppSettings(patch)
     res.json({ ok: true })
   })
 
@@ -343,10 +354,11 @@ export async function startServer(port: number): Promise<void> {
   // hot-reload server the desktop window uses doesn't drive this route; run
   // `npm run build` after overlay changes for OBS to see them.
   //
-  // Two routes, not one: split into independent Browser Sources per Noah's
-  // request, so the result toast and the leaderboard ticker can be sized
-  // and positioned separately in OBS instead of being stuck together on one
-  // shared page at fixed relative positions.
+  // Three routes, not one: split into independent Browser Sources per Noah's
+  // request, so each piece can be sized and positioned separately in OBS
+  // instead of being stuck together on one shared page at fixed relative
+  // positions. overlay-daily-stats is the newest (today's points/HS/races
+  // at a glance) — same split rationale as toast vs. leaderboard.
   //
   // Flat names (/overlay-toast, not /overlay/toast) are load-bearing, not
   // stylistic: electron-vite's renderer build emits relative asset paths
@@ -362,6 +374,9 @@ export async function startServer(port: number): Promise<void> {
   })
   app.get('/overlay-leaderboard', (_req, res) => {
     res.sendFile(join(__dirname, '../renderer/overlay-leaderboard.html'))
+  })
+  app.get('/overlay-daily-stats', (_req, res) => {
+    res.sendFile(join(__dirname, '../renderer/overlay-daily-stats.html'))
   })
 
   const httpServer = createServer(app)

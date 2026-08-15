@@ -1,0 +1,68 @@
+.daily-stats-overlay {
+  position: fixed;
+  top: 32px;
+  left: 32px;
+  background: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  font-family: var(--font-sans);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.daily-stats-overlay__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  text-shadow: 0 0 10px var(--accent-primary-glow);
+  margin-bottom: 10px;
+}
+
+.daily-stats-overlay__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.daily-stats-overlay__divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-hairline-strong);
+}
+
+.daily-stats-overlay__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.daily-stats-overlay__stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.daily-stats-overlay__stat-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.daily-stats-overlay__stat-value--race {
+  color: var(--mode-race);
+  text-shadow: 0 0 10px var(--mode-race-glow);
+}
+
+.daily-stats-overlay__stat-value--royale {
+  color: var(--mode-royale);
+  text-shadow: 0 0 10px var(--mode-royale-glow);
+}
