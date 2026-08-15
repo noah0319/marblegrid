@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import StatTile from '../components/StatTile'
 import { useStats } from '../hooks/useStats'
+import { useAppSettings } from '../hooks/useAppSettings'
 import { formatCompactNumber, formatFullNumber } from '@shared/format'
 import './Dashboard.css'
 
@@ -8,6 +9,7 @@ type Scope = 'season' | 'today'
 
 export default function Dashboard(): React.JSX.Element {
   const { season, today, loading } = useStats()
+  const { settings: appSettings } = useAppSettings()
   const [scope, setScope] = useState<Scope>('season')
 
   const stats = scope === 'season' ? season : today
@@ -45,7 +47,12 @@ export default function Dashboard(): React.JSX.Element {
           <StatTile label="Total Points" value={formatCompactNumber(stats.totalPoints)} tone="accent" />
           <StatTile label="Avg Points" value={formatFullNumber(stats.avgPoints)} />
           <StatTile label="Race HS" value={formatFullNumber(stats.raceHs)} tone="race" />
-          <StatTile label="BR HS" value={formatFullNumber(stats.brHs)} tone="royale" />
+          {/* Noah's ask: "lots of streamers don't do BRs but some do" — an
+              always-visible "BR HS: 0" tile is dead weight for a streamer
+              who never runs that mode. Defaults to shown (true) so nothing
+              changes for anyone unless explicitly turned off in Settings ->
+              Stats. */}
+          {appSettings.showBrHs && <StatTile label="BR HS" value={formatFullNumber(stats.brHs)} tone="royale" />}
         </div>
       )}
     </div>

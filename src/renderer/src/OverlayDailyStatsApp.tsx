@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { TodayStats } from '@shared/types'
 import { useTodayStats } from './hooks/useTodayStats'
+import { useAppSettings } from './hooks/useAppSettings'
 import DailyStatsOverlay from './components/DailyStatsOverlay'
 
 const PREVIEW_NAMES = ['TestRacer', 'PreviewUser', 'SampleName', 'DemoPlayer', 'ExampleFan']
@@ -31,6 +32,7 @@ function randomPreviewName(): string {
  */
 export default function OverlayDailyStatsApp(): React.JSX.Element {
   const isPreview = useMemo(() => new URLSearchParams(window.location.search).has('preview'), [])
+  const { settings } = useAppSettings()
 
   const previewStats = useMemo<TodayStats | null>(() => {
     if (!isPreview) return null
@@ -50,5 +52,11 @@ export default function OverlayDailyStatsApp(): React.JSX.Element {
   // even in preview mode; its result is simply unused when previewStats is set.
   const liveStats = useTodayStats()
 
-  return <DailyStatsOverlay stats={isPreview ? previewStats : liveStats} preview={isPreview} />
+  return (
+    <DailyStatsOverlay
+      stats={isPreview ? previewStats : liveStats}
+      preview={isPreview}
+      showBrHs={settings.showBrHs}
+    />
+  )
 }

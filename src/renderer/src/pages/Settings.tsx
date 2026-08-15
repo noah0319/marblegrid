@@ -92,6 +92,19 @@ export default function Settings(): React.JSX.Element {
     }
   }
 
+  // Noah's ask: "lots of streamers don't do BRs but some do" — saves
+  // immediately on toggle rather than needing a separate Save button, same
+  // as the Auto-post checkbox below (a boolean doesn't need a staged "are
+  // you sure" step the way a typed number/hour does).
+  async function toggleShowBrHs(checked: boolean): Promise<void> {
+    await fetch(`${BASE}/api/app-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showBrHs: checked })
+    })
+    await refreshAppSettings()
+  }
+
   const refresh = useCallback(async () => {
     const res = await fetch(`${BASE}/api/twitch/status`)
     if (res.ok) setStatus((await res.json()) as TwitchStatus)
@@ -499,6 +512,19 @@ export default function Settings(): React.JSX.Element {
           Controls where &quot;Today&quot; splits from &quot;yesterday&quot; — matters if your stream runs past
           midnight or you just prefer a different cutoff (e.g. 9 PM if you typically stream 10am–8pm). Default is
           6:00 AM.
+        </p>
+
+        <label className="settings__toggle">
+          <input
+            type="checkbox"
+            checked={appSettings.showBrHs}
+            onChange={(e) => void toggleShowBrHs(e.target.checked)}
+          />
+          <span>Show Battle Royale high score</span>
+        </label>
+        <p className="settings__hint">
+          Hides the BR HS tile on the Dashboard and the Daily Stats overlay — handy if you don&apos;t run Battle
+          Royale mode and don&apos;t want an always-zero stat taking up space. On by default.
         </p>
       </section>
     </div>

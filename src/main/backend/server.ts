@@ -148,8 +148,12 @@ export async function startServer(port: number): Promise<void> {
     res.json(getAppSettings())
   })
   app.post('/api/app-settings', (req, res) => {
-    const { toastDurationMs, dayBoundaryHour } = req.body as { toastDurationMs?: number; dayBoundaryHour?: number }
-    const patch: { toastDurationMs?: number; dayBoundaryHour?: number } = {}
+    const { toastDurationMs, dayBoundaryHour, showBrHs } = req.body as {
+      toastDurationMs?: number
+      dayBoundaryHour?: number
+      showBrHs?: boolean
+    }
+    const patch: { toastDurationMs?: number; dayBoundaryHour?: number; showBrHs?: boolean } = {}
     if (toastDurationMs !== undefined) {
       if (typeof toastDurationMs !== 'number' || !(toastDurationMs >= 1000) || !(toastDurationMs <= 120_000)) {
         res.status(400).json({ error: 'toastDurationMs must be a number between 1000 and 120000 (1-120 seconds)' })
@@ -163,6 +167,13 @@ export async function startServer(port: number): Promise<void> {
         return
       }
       patch.dayBoundaryHour = dayBoundaryHour
+    }
+    if (showBrHs !== undefined) {
+      if (typeof showBrHs !== 'boolean') {
+        res.status(400).json({ error: 'showBrHs must be a boolean' })
+        return
+      }
+      patch.showBrHs = showBrHs
     }
     updateAppSettings(patch)
     res.json({ ok: true })

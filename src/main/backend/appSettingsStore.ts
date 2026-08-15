@@ -20,11 +20,22 @@ export interface AppSettings {
    * instead of the default 6am splitting a still-live stream in two.
    */
   dayBoundaryHour: number
+  /**
+   * Whether Battle Royale's high score shows anywhere (Dashboard, the Daily
+   * Stats overlay) — Noah's ask: "lots of streamers don't do BRs but some
+   * do," so a streamer who never runs that mode isn't stuck with an
+   * always-visible "BR HS: 0" tile. Purely a display preference — the
+   * backend still tracks/computes brHs regardless, this only controls
+   * whether the UI renders it. Defaults true so nothing changes for anyone
+   * (including Noah) unless they opt out.
+   */
+  showBrHs: boolean
 }
 
 const DEFAULTS: AppSettings = {
   toastDurationMs: 10_000,
-  dayBoundaryHour: DEFAULT_DAY_BOUNDARY_HOUR
+  dayBoundaryHour: DEFAULT_DAY_BOUNDARY_HOUR,
+  showBrHs: true
 }
 
 let settingsPath: string | null = null

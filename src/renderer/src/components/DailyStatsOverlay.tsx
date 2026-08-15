@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { TodayStats } from '@shared/types'
 import { formatFullNumber } from '@shared/format'
 import './DailyStatsOverlay.css'
@@ -6,6 +7,16 @@ interface DailyStatsOverlayProps {
   stats: TodayStats | null
   /** Preview mode (Noah's ask: a way to see the overlay populated without waiting for real races) shows a badge so fake data is never mistaken for real. */
   preview?: boolean
+  /** Noah's ask: "lots of streamers don't do BRs but some do" — Settings -> Stats toggle. Defaults true. */
+  showBrHs?: boolean
+}
+
+interface StatDef {
+  key: string
+  label: string
+  value: string
+  holder?: string | null
+  tone?: 'race' | 'royale'
 }
 
 /**
@@ -16,8 +27,22 @@ interface DailyStatsOverlayProps {
  * (same two figures, same distinction) instead of inventing a new "best of
  * either" concept nothing else in the app uses. A dash shows while the
  * first fetch is still in flight rather than a misleading "0".
+ *
+ * Built from a list + Fragment map (rather than four hand-placed <Stat>s
+ * with hardcoded dividers) so BR HS can drop out cleanly when toggled off
+ * — the divider before it needs to disappear too, not just the stat itself,
+ * or there'd be an orphaned trailing divider.
  */
-export default function DailyStatsOverlay({ stats, preview = false }: DailyStatsOverlayProps): React.JSX.Element {
+export default function DailyStatsOverlay({ stats, preview = false, showBrHs = true }: DailyStatsOverlayProps): React.JSX.Element {
+  const items: StatDef[] = [
+    { key: 'points', label: 'Points', value: stats ? formatFullNumber(stats.totalPoints) : '—' },
+    { key: 'races', label: 'Races', value: stats ? formatFullNumber(stats.totalCount) : '—' },
+    { key: 'raceHs', label: 'Race HS', value: stats ? formatFullNumber(stats.raceHs) : '—', holder: stats?.raceHsHolder, tone: 'race' }
+  ]
+  if (showBrHs) {
+    items.push({ key: 'brHs', label: 'BR HS', value: stats ? formatFullNumber(stats.brHs) : '—', holder: stats?.brHsHolder, tone: 'royale' })
+  }
+
   return (
     <div className="daily-stats-overlay">
       <div className="daily-stats-overlay__header">
@@ -25,13 +50,12 @@ export default function DailyStatsOverlay({ stats, preview = false }: DailyStats
         {preview && <div className="daily-stats-overlay__preview-badge">Preview</div>}
       </div>
       <div className="daily-stats-overlay__row">
-        <Stat label="Points" value={stats ? formatFullNumber(stats.totalPoints) : '—'} />
-        <span className="daily-stats-overlay__divider" />
-        <Stat label="Races" value={stats ? formatFullNumber(stats.totalCount) : '—'} />
-        <span className="daily-stats-overlay__divider" />
-        <Stat label="Race HS" value={stats ? formatFullNumber(stats.raceHs) : '—'} holder={stats?.raceHsHolder} tone="race" />
-        <span className="daily-stats-overlay__divider" />
-        <Stat label="BR HS" value={stats ? formatFullNumber(stats.brHs) : '—'} holder={stats?.brHsHolder} tone="royale" />
+        {items.map((item, index) => (
+          <Fragment key={item.key}>
+            {index > 0 && <span className="daily-stats-overlay__divider" />}
+            <Stat label={item.label} value={item.value} holder={item.holder} tone={item.tone} />
+          </Fragment>
+        ))}
       </div>
     </div>
   )

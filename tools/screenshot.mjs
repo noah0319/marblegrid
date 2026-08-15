@@ -208,6 +208,47 @@ async function takeShots(app) {
   await shootOverlay('http://127.0.0.1:43117/overlay-daily-stats', '03c-overlay-daily-stats-simulated.png')
   await shootOverlay('http://127.0.0.1:43117/overlay-daily-stats?preview', '03d-overlay-daily-stats-preview-simulated.png')
 
+  // Toggleable BR HS (Noah's ask: "lots of streamers don't do BRs but some
+  // do") — same read-then-restore discipline as the giveaway-label dance
+  // below: read the REAL current value first, flip it off just long enough
+  // for two screenshots (Dashboard + the daily-stats overlay in preview
+  // mode, so a 3-item render is guaranteed even with zero real data), then
+  // restore whatever was really there. Never assume the starting value.
+  const originalAppSettings = await page.evaluate(async () => {
+    const res = await fetch('http://127.0.0.1:43117/api/app-settings')
+    return res.json()
+  })
+  await page.evaluate(async () => {
+    await fetch('http://127.0.0.1:43117/api/app-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showBrHs: false })
+    })
+  })
+  await page.goto('http://127.0.0.1:43117/overlay-daily-stats?preview')
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: path.join(OUT_DIR, '03e-overlay-daily-stats-no-br.png') })
+  console.log('screenshot:', path.join(OUT_DIR, '03e-overlay-daily-stats-no-br.png'))
+  const clickedDashboard = await page.evaluate(() => {
+    // Navigate the SAME window back to the desktop app to check the
+    // Dashboard's grid too, not just the overlay.
+    window.location.href = 'http://127.0.0.1:43117/'
+    return true
+  })
+  if (clickedDashboard) {
+    await page.waitForTimeout(1200)
+    await page.screenshot({ path: path.join(OUT_DIR, '01b-dashboard-no-br.png') })
+    console.log('screenshot:', path.join(OUT_DIR, '01b-dashboard-no-br.png'))
+  }
+  await page.evaluate(async (original) => {
+    await fetch('http://127.0.0.1:43117/api/app-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ showBrHs: original.showBrHs })
+    })
+  }, originalAppSettings)
+  console.log(`restored showBrHs to: ${originalAppSettings.showBrHs}`)
+
   // Giveaway labels (Noah's ask): set a real one via the API, confirm it
   // actually shows up on the live overlay, then put back whatever was
   // REALLY there before — never assume it was blank. A real incident:

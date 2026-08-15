@@ -6,9 +6,10 @@ const BASE = `http://127.0.0.1:${SERVER_PORT}`
 export interface AppSettings {
   toastDurationMs: number
   dayBoundaryHour: number
+  showBrHs: boolean
 }
 
-const DEFAULTS: AppSettings = { toastDurationMs: 10_000, dayBoundaryHour: 6 }
+const DEFAULTS: AppSettings = { toastDurationMs: 10_000, dayBoundaryHour: 6, showBrHs: true }
 
 interface AppSettingsState {
   settings: AppSettings

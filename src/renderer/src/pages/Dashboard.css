@@ -42,7 +42,10 @@
 
 .dashboard__grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* auto-fit rather than a hardcoded repeat(4, 1fr): BR HS is now optional
+     (Settings -> Stats), so this needs to look balanced at 3 tiles too,
+     not leave a gap where the 4th used to be. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
 }
 
