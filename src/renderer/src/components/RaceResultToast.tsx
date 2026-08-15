@@ -33,6 +33,19 @@ export default function RaceResultToast({
   const [visible, setVisible] = useState(false)
   const shownKeyRef = useRef<string | null>(null)
 
+  // Deliberately depends on event?.occurredAt (a primitive), NOT the whole
+  // event object. useLatestEvent refetches on every WS 'hello' (sent on
+  // every reconnect, not just the first — a fix for a DIFFERENT stale-
+  // overlay bug) and setEvent(await res.json()) always produces a brand-new
+  // object reference even when the data is identical. Depending on the
+  // whole object meant a reconnect mid-display re-ran this effect: cleanup
+  // cancelled the live hide-timer, then the shownKeyRef guard (correctly
+  // recognizing "same event") returned early WITHOUT scheduling a new one —
+  // leaving the toast stuck on screen indefinitely. That's the actual cause
+  // of "why isn't it hiding by itself." OverlayLeaderboard's popup timer
+  // already avoided this by depending on primitive row fields instead of
+  // the whole row object; this brings RaceResultToast in line with that
+  // already-proven-correct pattern.
   useEffect(() => {
     if (!event) return
     if (shownKeyRef.current === event.occurredAt) return
@@ -40,7 +53,8 @@ export default function RaceResultToast({
     setVisible(true)
     const timer = setTimeout(() => setVisible(false), visibleMs)
     return () => clearTimeout(timer)
-  }, [event, visibleMs])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.occurredAt, visibleMs])
 
   if (!event || !visible || hidden) return null
 

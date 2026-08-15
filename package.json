@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "node --experimental-strip-types --test tests/race-ingest.test.ts tests/day-boundary.test.ts tests/stats.test.ts tests/latest-event.test.ts tests/chat-poster.test.ts tests/map-records.test.ts tests/chat-commands.test.ts tests/map-notes.test.ts tests/map-community.test.ts tests/map-history.test.ts tests/file-watcher.test.ts tests/leaderboard-labels.test.ts tests/world-records.test.ts",
     "screenshot": "node tools/screenshot.mjs",
+    "verify-toast-hide": "node tools/verify-toast-hide.mjs",
     "dist": "electron-vite build && electron-builder --win"
   },
   "dependencies": {
