@@ -140,6 +140,7 @@ export type WsMessage =
   | { type: 'royale-event'; snapshotId: string }
   | { type: 'leaderboard-labels-changed' }
   | ({ type: 'world-record-event' } & WorldRecordPayload)
+  | { type: 'update-ready'; version: string }
 
 /** Broadcast the moment a world record is confirmed broken — see customMapPlayed.ts's diff-based detection. Purely a live push, no catch-up GET endpoint: missing the live moment means missing the celebration, same as any broadcast graphic, and the chat post still announces it either way. */
 export interface WorldRecordPayload {

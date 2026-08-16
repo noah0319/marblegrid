@@ -1,4 +1,17 @@
 import { autoUpdater } from 'electron-updater'
+import { broadcast } from './backend/ws.ts'
+
+/**
+ * Set once a download finishes, read by GET /api/status so the desktop
+ * window can show the banner even if it was closed (tray-resident app) when
+ * the download actually completed — the live WS push alone only reaches a
+ * window that happens to be open at that exact moment.
+ */
+let updateReadyVersion: string | null = null
+
+export function getUpdateReadyVersion(): string | null {
+  return updateReadyVersion
+}
 
 /**
  * Noah's ask: push updates without everyone having to redownload and
@@ -24,10 +37,14 @@ export function initAutoUpdater(): void {
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
 
-  // Console-only for now, not a UI toast — this is meant to be invisible
-  // until it just works. Noah can already see the current version in the
-  // sidebar; a future pass could surface "update ready, will apply on
-  // restart" there too if he wants more visibility.
+  // Everything below is still logged to console for debugging, but
+  // 'update-downloaded' now also surfaces a real, visible banner in the
+  // desktop window (Layout.tsx via useUpdateReady) — Noah's ask, after
+  // finding out the console-only version gave him nothing to actually watch
+  // happen. Deliberately only THIS event gets a banner, not
+  // 'update-available' or the check itself — "ready to install" is the one
+  // moment that's actually actionable; anything earlier is just noise on a
+  // background process nobody needs to babysit.
   autoUpdater.on('error', (err) => {
     // eslint-disable-next-line no-console
     console.log('[auto-update] error:', err.message)
@@ -43,6 +60,8 @@ export function initAutoUpdater(): void {
   autoUpdater.on('update-downloaded', (info) => {
     // eslint-disable-next-line no-console
     console.log('[auto-update] downloaded, will install next time the app quits:', info.version)
+    updateReadyVersion = info.version
+    broadcast({ type: 'update-ready', version: info.version })
   })
 
   // Fire-and-forget: a failed update check must never block or crash

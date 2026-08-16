@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { useAppVersion } from '../hooks/useAppVersion'
+import { useUpdateReady } from '../hooks/useUpdateReady'
 import './Layout.css'
 
 export type Page = 'dashboard' | 'leaderboard' | 'maps' | 'settings'
@@ -19,6 +21,11 @@ const NAV_ITEMS: { id: Page; label: string }[] = [
 
 export default function Layout({ page, onNavigate, children }: LayoutProps): React.JSX.Element {
   const version = useAppVersion()
+  const updateReadyVersion = useUpdateReady()
+  // Resets on next window open by design (fresh mount) — cheap and low-
+  // stakes to just show it again rather than persisting a dismissal, and it
+  // stays true either way ("still pending") until the next real quit.
+  const [dismissed, setDismissed] = useState(false)
 
   return (
     <div className="layout">
@@ -41,7 +48,25 @@ export default function Layout({ page, onNavigate, children }: LayoutProps): Rea
           ))}
         </ul>
       </nav>
-      <main className="layout__content">{children}</main>
+      <main className="layout__content">
+        {updateReadyVersion && !dismissed && (
+          <div className="update-banner" role="status">
+            <span>
+              Update <strong>v{updateReadyVersion}</strong> is downloaded — it&apos;ll apply next
+              time you fully quit MarbleGrid.
+            </span>
+            <button
+              type="button"
+              className="update-banner__dismiss"
+              onClick={() => setDismissed(true)}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   )
 }

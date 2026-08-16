@@ -31,6 +31,7 @@ import {
 import { sendTestPost } from './twitch/chatPoster.ts'
 import { buildChatMessage } from './twitch/messageTemplates.ts'
 import { startChatListener, stopChatListener, isChatListenerActive } from './twitch/chatListener.ts'
+import { getUpdateReadyVersion } from '../updater.ts'
 import type { TwitchStatus, TodayStats } from '../../shared/types.ts'
 
 /**
@@ -67,7 +68,17 @@ export async function startServer(port: number): Promise<void> {
     // electronApp.getVersion() reads straight from package.json's "version"
     // field as actually bundled — always accurate for both dev and packaged
     // builds, unlike importing package.json directly.
-    res.json({ status: 'OK', app: 'MarbleGrid', phase: 5, version: electronApp.getVersion() })
+    res.json({
+      status: 'OK',
+      app: 'MarbleGrid',
+      phase: 5,
+      version: electronApp.getVersion(),
+      // Non-null once electron-updater has finished downloading a newer
+      // build in the background — lets a freshly (re)opened window show the
+      // "ready to install" banner even if the download finished while the
+      // window was closed (tray-resident app, so that's a real case).
+      updateReadyVersion: getUpdateReadyVersion()
+    })
   })
 
   // Real stats routes — Phase 2. Day-boundary hour is now a real per-user
