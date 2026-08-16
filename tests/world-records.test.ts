@@ -82,6 +82,13 @@ test('a SLOWER time reported for a known map is not a new record', () => {
 
 test('a genuinely FASTER time is a real record break — fires an alert and updates the stored baseline', () => {
   ingestCustomMapPlayedFromText(customMapPlayedCsv({ mapName: 'speedway', recordTime: 100, recordHolderName: 'Alice' }))
+
+  // Bob's break must be a LOCAL race (this channel's own) for the alert to
+  // fire at all now — see the "no matching local race" test below for the
+  // real bug this gate exists to prevent.
+  const race = syntheticRace({ snapshotId: 's1', mapName: 'speedway', winnerName: 'Bob', winnerPoints: 250 })
+  ingestRaceFromText(race.summary, race.participants) // Bob's LOCAL finish was 90.000000s
+
   const result = ingestCustomMapPlayedFromText(
     customMapPlayedCsv({ mapName: 'speedway', recordTime: 90, recordHolderName: 'Bob' })
   )
@@ -111,17 +118,46 @@ test('a record break cross-references the matching real race for points earned',
   assert.equal(result?.pointsEarned, 777)
 })
 
-test('a record break with no matching race still fires — pointsEarned is null, not 0 or a crash', () => {
+test('a record break with NO matching local race does not fire — the record was set on a different channel, not this one', () => {
+  // Real bug Noah caught: LastCustomRaceMapPlayed.csv is the game's own
+  // GLOBAL snapshot — a faster time set on a completely different stream
+  // shows up here too, and used to get misreported as if it just happened
+  // on this channel. The baseline must still update silently (so
+  // !ghostballs etc. stay accurate) but chat must stay quiet.
   ingestCustomMapPlayedFromText(customMapPlayedCsv({ mapName: 'speedway', recordTime: 100, recordHolderName: 'Alice' }))
   const result = ingestCustomMapPlayedFromText(
-    customMapPlayedCsv({ mapName: 'speedway', recordTime: 90, recordHolderName: 'NobodyMarbleGridHasSeen' })
+    customMapPlayedCsv({ mapName: 'speedway', recordTime: 90, recordHolderName: 'NobodyOnThisChannel' })
   )
-  assert.ok(result)
-  assert.equal(result?.pointsEarned, null)
+  assert.equal(result, null, 'no local race matches this holder+time, so no alert should fire')
+
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM custom_map_records').get() as Record<string, unknown>
+  assert.equal(row.record_time_seconds, 90, 'the baseline still tracks the real (updated) record...')
+  assert.equal(row.record_holder_name, 'NobodyOnThisChannel', '...even though nothing was announced to chat')
+})
+
+test('a record break where the name matches but the TIME does not still does not fire', () => {
+  // A coincidental name match at a different (unrelated, presumably older
+  // or slower) time must not be trusted as "this is the same run."
+  ingestCustomMapPlayedFromText(customMapPlayedCsv({ mapName: 'speedway', recordTime: 100, recordHolderName: 'Alice' }))
+
+  const race = syntheticRace({ snapshotId: 's1', mapName: 'speedway', winnerName: 'Bob', winnerPoints: 500 })
+  ingestRaceFromText(race.summary, race.participants) // Bob's LOCAL finish was 90.000000s (see syntheticRace)
+
+  // Reports Bob as the new record holder, but at a DIFFERENT time than his
+  // real local finish — not the same run, must not fire.
+  const result = ingestCustomMapPlayedFromText(
+    customMapPlayedCsv({ mapName: 'speedway', recordTime: 45, recordHolderName: 'Bob' })
+  )
+  assert.equal(result, null)
 })
 
 test('map identity is case-insensitive — the same map reported differently-cased is still one tracked record', () => {
   ingestCustomMapPlayedFromText(customMapPlayedCsv({ mapName: 'speedway', recordTime: 100, recordHolderName: 'Alice' }))
+
+  const race = syntheticRace({ snapshotId: 's1', mapName: 'speedway', winnerName: 'Bob', winnerPoints: 250 })
+  ingestRaceFromText(race.summary, race.participants) // Bob's LOCAL finish was 90.000000s
+
   const result = ingestCustomMapPlayedFromText(
     customMapPlayedCsv({ mapName: 'SPEEDWAY', recordTime: 90, recordHolderName: 'Bob' })
   )
@@ -136,9 +172,12 @@ test('two different maps are tracked completely independently', () => {
   ingestCustomMapPlayedFromText(customMapPlayedCsv({ mapName: 'speedway', recordTime: 100, recordHolderName: 'Alice' }))
   ingestCustomMapPlayedFromText(customMapPlayedCsv({ mapName: 'skyline', recordTime: 200, recordHolderName: 'Carol' }))
 
+  const race = syntheticRace({ snapshotId: 's1', mapName: 'skyline', winnerName: 'Dave', winnerPoints: 250 })
+  ingestRaceFromText(race.summary, race.participants) // Dave's LOCAL finish was 90.000000s
+
   // A record break on "skyline" must not touch "speedway"'s stored record.
   const result = ingestCustomMapPlayedFromText(
-    customMapPlayedCsv({ mapName: 'skyline', recordTime: 150, recordHolderName: 'Dave' })
+    customMapPlayedCsv({ mapName: 'skyline', recordTime: 90, recordHolderName: 'Dave' })
   )
   assert.equal(result?.mapName, 'skyline')
 

@@ -146,3 +146,23 @@ export function clearMapRecordOverride(mapName: string, mapCreator: string): voi
   const db = getDb()
   db.prepare(`DELETE FROM map_record_overrides WHERE map_name = ? AND map_creator = ?`).run(mapName, mapCreator)
 }
+
+export interface LastPlayedMap {
+  mapName: string
+  mapCreator: string
+}
+
+/** The most recent Race-mode map played, if any — powers !lastmap. Race mode only, same scope as everything else in this file (Tilt/Royale don't have a "map" the same way). */
+export function getLastPlayedMap(): LastPlayedMap | null {
+  const db = getDb()
+  const row = db
+    .prepare(
+      `SELECT map_name as mapName, map_creator as mapCreator
+       FROM race_events
+       WHERE map_name IS NOT NULL AND map_name != ''
+       ORDER BY captured_at_local DESC
+       LIMIT 1`
+    )
+    .get() as LastPlayedMap | undefined
+  return row ?? null
+}

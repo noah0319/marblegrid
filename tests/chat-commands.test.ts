@@ -5,6 +5,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { initDb, closeDb } from '../src/main/backend/db/db.ts'
 import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
+import { setMapNote } from '../src/main/backend/db/queries/mapNotes.ts'
 import { handleChatCommand, resetCommandCooldowns } from '../src/main/backend/twitch/commands.ts'
 import type { ChatCommandContext } from '../src/main/backend/twitch/commands.ts'
 
@@ -216,6 +217,51 @@ test('a global-cooldown command (!top10today) is shared across ALL users, not pe
   const secondDifferentUser = handleChatCommand('!top10today', ctx({ chatterId: 'user-b' }))
   assert.ok(first)
   assert.equal(secondDifferentUser, null, 'global cooldown must block a second caller too, not just the same one')
+})
+
+test('!lastmap is friendly when no map has been played yet, not a crash', () => {
+  const reply = handleChatCommand('!lastmap', ctx())
+  assert.equal(reply, 'No maps played yet.')
+})
+
+test('!lastmap reports the real most-recently-played map with its stats and Ghost Ball record', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // map: "feel the fire" by zim2325, schoklad's real finish is the Ghost Ball
+  const reply = handleChatCommand('!lastmap', ctx())
+  assert.match(reply ?? '', /^🗺️ Last map: feel the fire \(zim2325\) —/)
+  // Underlying death-rate/avg-finish math is covered by map-community.test.ts —
+  // this test's job is the command wiring, not re-deriving that arithmetic.
+  assert.match(reply ?? '', /death rate/)
+  assert.match(reply ?? '', /played 1x/)
+  assert.match(reply ?? '', /Ghost Ball 2m 13\.4s by schoklad/, 'must cross-reference the real Ghost Ball record for this map')
+})
+
+test('!notes with no argument gives a usage hint instead of guessing', () => {
+  const reply = handleChatCommand('!notes', ctx())
+  assert.equal(reply, 'Usage: !notes <map name>')
+})
+
+test('!notes posts the real saved note for a map', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  setMapNote({ mapName: 'feel the fire', mapCreator: 'zim2325', noteText: 'Shortcut on the second ramp — jump early.' })
+  const reply = handleChatCommand('!notes feel the fire', ctx())
+  assert.equal(reply, '📝 feel the fire (zim2325): Shortcut on the second ramp — jump early.')
+})
+
+test('!notes matches case-insensitively and by partial name, same as !ghostballs', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  setMapNote({ mapName: 'feel the fire', mapCreator: 'zim2325', noteText: 'Watch the gap.' })
+  const reply = handleChatCommand('!notes FIRE', ctx())
+  assert.match(reply ?? '', /Watch the gap\./)
+})
+
+test('!notes distinguishes "no map found" from "map exists but has no note yet"', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // known map, no note ever set on it
+
+  const noMap = handleChatCommand('!notes totally-nonexistent-xyz', ctx({ chatterId: 'a' }))
+  assert.equal(noMap, 'No map found matching "totally-nonexistent-xyz".')
+
+  const noNote = handleChatCommand('!notes feel the fire', ctx({ chatterId: 'b' }))
+  assert.equal(noNote, 'No notes set for feel the fire yet.')
 })
 
 test('cooldown expires after enough time passes', () => {

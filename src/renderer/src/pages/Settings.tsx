@@ -455,6 +455,14 @@ export default function Settings(): React.JSX.Element {
                 <span className="settings__mono">!ghostballs &lt;map&gt;</span> — that map&apos;s best time and
                 who holds it
               </li>
+              <li>
+                <span className="settings__mono">!lastmap</span> — the last map played, death rate, avg finish
+                time, and its Ghost Ball record
+              </li>
+              <li>
+                <span className="settings__mono">!notes &lt;map&gt;</span> — posts whatever note you&apos;ve saved
+                for that map (Maps → Notes)
+              </li>
             </ul>
           </>
         )}

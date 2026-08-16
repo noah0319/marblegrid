@@ -6,7 +6,10 @@ import {
   getRacerDisplayName
 } from '../db/queries/racerStats.ts'
 import { getTodayLeaderboard, getLeaderboard } from '../db/queries/leaderboard.ts'
-import { getMapRecords } from '../db/queries/mapRecords.ts'
+import { getMapRecords, getLastPlayedMap } from '../db/queries/mapRecords.ts'
+import { getMapCommunityStats } from '../db/queries/mapCommunity.ts'
+import { getMapNotes } from '../db/queries/mapNotes.ts'
+import { mapKey } from '../db/queries/mapKey.ts'
 import { getSeasonStats, getSeasonRaceHighScore } from '../db/queries/stats.ts'
 import { getOpenSeasonId } from '../db/queries/seasons.ts'
 import { getAppSettings } from '../appSettingsStore.ts'
@@ -40,7 +43,9 @@ const COMMANDS: Record<string, CommandDef> = {
   '!top10today': { cooldownScope: 'global', cooldownMs: 15_000, handler: top10Today },
   '!top10season': { cooldownScope: 'global', cooldownMs: 15_000, handler: top10Season },
   '!racehs': { cooldownScope: 'global', cooldownMs: 15_000, handler: raceHs },
-  '!ghostballs': { cooldownScope: 'user', cooldownMs: 10_000, handler: ghostBalls }
+  '!ghostballs': { cooldownScope: 'user', cooldownMs: 10_000, handler: ghostBalls },
+  '!lastmap': { cooldownScope: 'global', cooldownMs: 15_000, handler: lastMap },
+  '!notes': { cooldownScope: 'user', cooldownMs: 10_000, handler: mapNotesCommand }
 }
 
 let lastTriggered = new Map<string, number>()
@@ -185,4 +190,66 @@ function ghostBalls(args: string): string {
     .join(', ')
   const more = matches.length > 5 ? `, +${matches.length - 5} more` : ''
   return `Multiple maps match "${args}": ${names}${more} — try being more specific.`
+}
+
+/**
+ * Noah's ask: "the last map played along with death percentage, avg time,
+ * etc." Race mode only, same scope as Ghost Balls/Community — Tilt/Royale
+ * don't have a "map" the same way. Reuses getMapCommunityStats/getMapRecords
+ * rather than re-deriving the same aggregation logic here.
+ */
+function lastMap(): string {
+  const last = getLastPlayedMap()
+  if (!last) return 'No maps played yet.'
+
+  const key = mapKey(last.mapName, last.mapCreator)
+  const community = getMapCommunityStats().find((m) => mapKey(m.mapName, m.mapCreator) === key)
+  const record = getMapRecords().find((m) => mapKey(m.mapName, m.mapCreator) === key)
+
+  const deathRate = community ? `${community.deathRatePercent.toFixed(0)}% death rate` : 'no death rate data'
+  const avgTime =
+    community?.avgFinishSeconds != null ? `avg finish ${formatSeconds(community.avgFinishSeconds)}` : 'no finishes yet'
+  const played = community ? `played ${community.raceCount}x` : ''
+  const recordPart = record ? ` — Ghost Ball ${formatSeconds(record.timeSeconds)} by ${record.racerName}` : ''
+
+  return `🗺️ Last map: ${last.mapName} (${last.mapCreator}) — ${deathRate}, ${avgTime}, ${played}${recordPart}.`
+}
+
+/**
+ * Noah's ask: "!notes command so if i do that command followed by the map
+ * name it will post the notes ive listed for that map in my chat." Search/
+ * multi-match handling mirrors !ghostballs — matches by creator too, and
+ * asks for more specificity if several maps match. Distinguishes "no map
+ * matches at all" from "the map exists but has no note yet," since those
+ * mean different things to whoever's asking.
+ */
+function mapNotesCommand(args: string): string {
+  if (!args) return 'Usage: !notes <map name>'
+
+  const query = args.toLowerCase()
+  const nameMatches = getMapNotes().filter(
+    (n) => n.mapName.toLowerCase().includes(query) || n.mapCreator.toLowerCase().includes(query)
+  )
+  if (nameMatches.length === 0) return `No map found matching "${args}".`
+
+  const withNotes = nameMatches.filter((n) => n.noteText)
+  if (withNotes.length === 0) {
+    return nameMatches.length === 1
+      ? `No notes set for ${nameMatches[0]!.mapName} yet.`
+      : `No notes set for any map matching "${args}" yet.`
+  }
+  if (withNotes.length === 1) {
+    const n = withNotes[0]!
+    const prefix = `📝 ${n.mapName} (${n.mapCreator}): `
+    const budget = MAX_MESSAGE_LENGTH - prefix.length
+    const note = n.noteText.length > budget ? `${n.noteText.slice(0, Math.max(0, budget - 1))}…` : n.noteText
+    return `${prefix}${note}`
+  }
+
+  const names = withNotes
+    .slice(0, 5)
+    .map((n) => `${n.mapName} (${n.mapCreator})`)
+    .join(', ')
+  const more = withNotes.length > 5 ? `, +${withNotes.length - 5} more` : ''
+  return `Multiple noted maps match "${args}": ${names}${more} — try being more specific.`
 }
