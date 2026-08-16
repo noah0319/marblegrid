@@ -211,6 +211,7 @@ export async function startServer(port: number): Promise<void> {
       connected: isConnected(),
       login: settings.login,
       autoPostEnabled: settings.autoPostEnabled,
+      autoPostLastMapEnabled: settings.autoPostLastMapEnabled,
       chatCommandsActive: isChatListenerActive(),
       botConnected: isBotConnected(),
       botLogin: settings.botLogin
@@ -267,6 +268,16 @@ export async function startServer(port: number): Promise<void> {
   app.post('/api/twitch/auto-post', (req, res) => {
     const { enabled } = req.body as { enabled?: boolean }
     updateSettings({ autoPostEnabled: Boolean(enabled) })
+    res.json({ ok: true })
+  })
+
+  // Noah's ask: a SEPARATE toggle from the one above — posts !lastmap's info
+  // automatically after every race instead of needing someone to type the
+  // command. Independent on/off state, own route, same reasoning as keeping
+  // world-record alerts distinct from a hypothetical "post everything" flag.
+  app.post('/api/twitch/auto-post-lastmap', (req, res) => {
+    const { enabled } = req.body as { enabled?: boolean }
+    updateSettings({ autoPostLastMapEnabled: Boolean(enabled) })
     res.json({ ok: true })
   })
 

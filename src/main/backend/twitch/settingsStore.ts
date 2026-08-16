@@ -16,6 +16,8 @@ export interface TwitchSettings {
   clientId: string
   clientSecret: string
   autoPostEnabled: boolean
+  /** Noah's ask: post the !lastmap info (death rate, avg time, Ghost Ball record) automatically after every race, no command needed. Separate from autoPostEnabled — a streamer might want either independently. Defaults off, same safety convention as every other auto-post toggle. */
+  autoPostLastMapEnabled: boolean
   token: AccessToken | null
   userId: string | null
   login: string | null
@@ -32,6 +34,7 @@ const DEFAULTS: TwitchSettings = {
   clientId: '',
   clientSecret: '',
   autoPostEnabled: false,
+  autoPostLastMapEnabled: false,
   token: null,
   userId: null,
   login: null,

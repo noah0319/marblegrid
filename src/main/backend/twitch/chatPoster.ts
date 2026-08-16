@@ -1,7 +1,8 @@
 import { getDb } from '../db/db.ts'
 import { getSettings } from './settingsStore.ts'
 import { getBroadcasterUserId, sendChatMessageAsConfigured } from './auth.ts'
-import { buildChatMessage, buildWorldRecordMessage, TEST_POST_MESSAGE } from './messageTemplates.ts'
+import { buildChatMessage, buildWorldRecordMessage, buildLastMapMessage, TEST_POST_MESSAGE } from './messageTemplates.ts'
+import { getLastMapSummary, type LastMapSummary } from '../db/queries/mapRecords.ts'
 import type { LatestEventSummary } from '../../../shared/types.ts'
 import type { WorldRecordBroken } from '../watcher/parsers/customMapPlayed.ts'
 
@@ -155,6 +156,75 @@ async function sendWorldRecordWithRetry(
        ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
          attempted_at = excluded.attempted_at, success = 0, message = excluded.message, error = excluded.error`
     ).run(identity, new Date().toISOString(), message, errorMessage)
+    return { attempted: true, success: false, error: errorMessage }
+  }
+}
+
+/**
+ * Noah's ask: a separate toggle to post !lastmap's info automatically after
+ * EVERY race, not just on-demand when someone types the command. Deliberately
+ * a distinct toggle from autoPostEnabled — a streamer might want either
+ * independently. Keyed by the triggering race's occurredAt (not the map),
+ * so back-to-back races on the SAME map each still get their own post —
+ * "after each race" is literal, not "once per map." Same retry-once/
+ * restart-safe dedupe policy as the other two posters, reusing chat_post_log
+ * with event_kind = 'last_map'.
+ */
+export async function maybePostLastMapToChat(
+  occurredAt: string,
+  sendFn: SendFn = defaultSend
+): Promise<ChatPostResult> {
+  const settings = getSettings()
+  if (!settings.autoPostLastMapEnabled) return { attempted: false, success: false }
+
+  const broadcasterId = getBroadcasterUserId()
+  if (!broadcasterId) return { attempted: false, success: false, error: 'Twitch is not connected' }
+
+  const db = getDb()
+  const alreadyPosted = db
+    .prepare(`SELECT 1 FROM chat_post_log WHERE event_kind = 'last_map' AND event_occurred_at = ? AND success = 1`)
+    .get(occurredAt)
+  if (alreadyPosted) return { attempted: false, success: false }
+
+  const summary = getLastMapSummary()
+  if (!summary) return { attempted: false, success: false }
+
+  return sendLastMapWithRetry(summary, occurredAt, broadcasterId, sendFn, 1)
+}
+
+async function sendLastMapWithRetry(
+  summary: LastMapSummary,
+  occurredAt: string,
+  broadcasterId: string,
+  sendFn: SendFn,
+  retriesLeft: number
+): Promise<ChatPostResult> {
+  const db = getDb()
+  const message = buildLastMapMessage(summary)
+
+  try {
+    await sendFn(broadcasterId, message)
+    db.prepare(
+      `INSERT INTO chat_post_log (event_kind, event_occurred_at, attempted_at, success, message, error)
+       VALUES ('last_map', ?, ?, 1, ?, NULL)
+       ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
+         attempted_at = excluded.attempted_at, success = 1, message = excluded.message, error = NULL`
+    ).run(occurredAt, new Date().toISOString(), message)
+    return { attempted: true, success: true, message }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+
+    if (retriesLeft > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      return sendLastMapWithRetry(summary, occurredAt, broadcasterId, sendFn, retriesLeft - 1)
+    }
+
+    db.prepare(
+      `INSERT INTO chat_post_log (event_kind, event_occurred_at, attempted_at, success, message, error)
+       VALUES ('last_map', ?, ?, 0, ?, ?)
+       ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
+         attempted_at = excluded.attempted_at, success = 0, message = excluded.message, error = excluded.error`
+    ).run(occurredAt, new Date().toISOString(), message, errorMessage)
     return { attempted: true, success: false, error: errorMessage }
   }
 }

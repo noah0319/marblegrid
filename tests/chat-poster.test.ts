@@ -1,14 +1,25 @@
 import { test, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { tmpdir } from 'os'
-import { join } from 'path'
-import { rmSync } from 'fs'
+import { join, dirname } from 'path'
+import { rmSync, readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
 import { initDb, closeDb, getDb } from '../src/main/backend/db/db.ts'
 import { initSettingsStore, updateSettings } from '../src/main/backend/twitch/settingsStore.ts'
-import { maybePostEventToChat, maybePostWorldRecordToChat, sendTestPost } from '../src/main/backend/twitch/chatPoster.ts'
+import {
+  maybePostEventToChat,
+  maybePostWorldRecordToChat,
+  maybePostLastMapToChat,
+  sendTestPost
+} from '../src/main/backend/twitch/chatPoster.ts'
 import { buildChatMessage, buildWorldRecordMessage } from '../src/main/backend/twitch/messageTemplates.ts'
+import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
 import type { LatestEventSummary } from '../src/shared/types.ts'
 import type { WorldRecordBroken } from '../src/main/backend/watcher/parsers/customMapPlayed.ts'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const FIXTURES_DIR = join(__dirname, 'fixtures')
+const read = (name: string): string => readFileSync(join(FIXTURES_DIR, name), 'utf-8')
 
 let settingsPath: string
 
@@ -283,6 +294,105 @@ test('maybePostWorldRecordToChat retries exactly once on failure, then gives up 
   }
 
   const result = await maybePostWorldRecordToChat(worldRecord, alwaysFails)
+
+  assert.equal(calls, 2)
+  assert.equal(result.success, false)
+  assert.equal(result.error, 'simulated network failure')
+})
+
+test('maybePostLastMapToChat does nothing when its toggle is off (the default), even if regular auto-post is on', async () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  updateSettings({ userId: 'u1', autoPostEnabled: true, autoPostLastMapEnabled: false })
+  let calls = 0
+  const result = await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', async () => {
+    calls += 1
+  })
+  assert.equal(result.attempted, false)
+  assert.equal(calls, 0)
+})
+
+test('maybePostLastMapToChat does nothing when enabled but nothing is connected', async () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  updateSettings({ userId: null, autoPostLastMapEnabled: true })
+  let calls = 0
+  const result = await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', async () => {
+    calls += 1
+  })
+  assert.equal(result.attempted, false)
+  assert.equal(calls, 0)
+})
+
+test('maybePostLastMapToChat does nothing when no map has ever been played, not a crash', async () => {
+  updateSettings({ userId: 'u1', autoPostLastMapEnabled: true })
+  let calls = 0
+  const result = await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', async () => {
+    calls += 1
+  })
+  assert.equal(result.attempted, false)
+  assert.equal(calls, 0)
+})
+
+test('maybePostLastMapToChat sends the real !lastmap-equivalent info and logs success when enabled and connected', async () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  updateSettings({ userId: 'u1', autoPostLastMapEnabled: true })
+  const sent: { broadcasterId: string; message: string }[] = []
+  const result = await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', async (broadcasterId, message) => {
+    sent.push({ broadcasterId, message })
+  })
+
+  assert.equal(result.attempted, true)
+  assert.equal(result.success, true)
+  assert.equal(sent.length, 1)
+  assert.match(sent[0]?.message ?? '', /^🗺️ Last map: feel the fire \(zim2325\)/)
+
+  const db = getDb()
+  const row = db
+    .prepare(`SELECT * FROM chat_post_log WHERE event_kind = 'last_map' AND event_occurred_at = ?`)
+    .get('2026-08-11T16:59:03.229Z') as { success: number }
+  assert.equal(row.success, 1)
+})
+
+test('maybePostLastMapToChat never posts for the exact same race twice (restart-safe dedupe)', async () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  updateSettings({ userId: 'u1', autoPostLastMapEnabled: true })
+  let calls = 0
+  const sendFn = async (): Promise<void> => {
+    calls += 1
+  }
+
+  await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', sendFn)
+  const second = await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', sendFn)
+
+  assert.equal(calls, 1)
+  assert.equal(second.attempted, false)
+})
+
+test('maybePostLastMapToChat posts AGAIN for a DIFFERENT race on the same map — "after each race" is literal, not "once per map"', async () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  updateSettings({ userId: 'u1', autoPostLastMapEnabled: true })
+  let calls = 0
+  const sendFn = async (): Promise<void> => {
+    calls += 1
+  }
+
+  const first = await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', sendFn)
+  const secondRaceSameMap = await maybePostLastMapToChat('2026-08-11T17:05:00.000Z', sendFn)
+
+  assert.equal(calls, 2)
+  assert.equal(first.attempted, true)
+  assert.equal(secondRaceSameMap.attempted, true)
+})
+
+test('maybePostLastMapToChat retries exactly once on failure, then gives up and logs', async () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  updateSettings({ userId: 'u1', autoPostLastMapEnabled: true })
+  let calls = 0
+  const alwaysFails = async (): Promise<void> => {
+    calls += 1
+    throw new Error('simulated network failure')
+  }
+
+  const result = await maybePostLastMapToChat('2026-08-11T16:59:03.229Z', alwaysFails)
 
   assert.equal(calls, 2)
   assert.equal(result.success, false)

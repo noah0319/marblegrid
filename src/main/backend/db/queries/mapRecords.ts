@@ -1,6 +1,7 @@
 import { getDb } from '../db.ts'
 import { mapKey } from './mapKey.ts'
-import type { MapRecord } from '../../../../shared/types.ts'
+import { getMapCommunityStats } from './mapCommunity.ts'
+import type { MapRecord, MapCommunityStat } from '../../../../shared/types.ts'
 
 interface ComputedRow {
   mapName: string
@@ -165,4 +166,30 @@ export function getLastPlayedMap(): LastPlayedMap | null {
     )
     .get() as LastPlayedMap | undefined
   return row ?? null
+}
+
+export interface LastMapSummary {
+  mapName: string
+  mapCreator: string
+  community: MapCommunityStat | undefined
+  record: MapRecord | undefined
+}
+
+/**
+ * Everything !lastmap (the chat command) and the auto-post-after-each-race
+ * toggle both need — kept as ONE shared function so the two features can
+ * never drift into showing different numbers for "the last map." Formatting
+ * lives separately in messageTemplates.ts's buildLastMapMessage, which both
+ * call sites also share.
+ */
+export function getLastMapSummary(): LastMapSummary | null {
+  const last = getLastPlayedMap()
+  if (!last) return null
+  const key = mapKey(last.mapName, last.mapCreator)
+  return {
+    mapName: last.mapName,
+    mapCreator: last.mapCreator,
+    community: getMapCommunityStats().find((m) => mapKey(m.mapName, m.mapCreator) === key),
+    record: getMapRecords().find((m) => mapKey(m.mapName, m.mapCreator) === key)
+  }
 }

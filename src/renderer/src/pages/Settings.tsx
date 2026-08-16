@@ -191,6 +191,18 @@ export default function Settings(): React.JSX.Element {
     await refresh()
   }
 
+  // Noah's ask: a separate toggle from the one above — posts !lastmap's
+  // info automatically after every race instead of needing someone to type
+  // the command.
+  async function toggleAutoPostLastMap(enabled: boolean): Promise<void> {
+    await fetch(`${BASE}/api/twitch/auto-post-lastmap`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    })
+    await refresh()
+  }
+
   async function sendTestPost(): Promise<void> {
     setTesting(true)
     setTestResult(null)
@@ -411,6 +423,20 @@ export default function Settings(): React.JSX.Element {
             <p className="settings__hint">
               Defaults off on purpose. Verify with a test post and watch the dashboard track correctly for a
               bit before turning this on — and ideally on a low-stakes stream, not a big event night.
+            </p>
+
+            <label className="settings__toggle">
+              <input
+                type="checkbox"
+                checked={status.autoPostLastMapEnabled}
+                onChange={(e) => void toggleAutoPostLastMap(e.target.checked)}
+              />
+              <span>Auto-post last map info after each race</span>
+            </label>
+            <p className="settings__hint">
+              Posts the same info as <span className="settings__mono">!lastmap</span> (death rate, avg finish
+              time, Ghost Ball record) automatically once each race lands — nobody needs to type the command.
+              Separate from the toggle above, so you can run either one on its own. Defaults off.
             </p>
           </>
         )}

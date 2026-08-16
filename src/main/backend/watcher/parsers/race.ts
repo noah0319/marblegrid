@@ -8,7 +8,7 @@ import { RaceSummarySchema, RaceParticipantSchema } from '../../../../shared/typ
 import { MARBLES_SAVE_DIR } from '../paths.ts'
 import { broadcast } from '../../ws.ts'
 import { getLatestEvent } from '../../db/queries/latestEvent.ts'
-import { maybePostEventToChat } from '../../twitch/chatPoster.ts'
+import { maybePostEventToChat, maybePostLastMapToChat } from '../../twitch/chatPoster.ts'
 
 export async function ingestRaceFiles(dir: string = MARBLES_SAVE_DIR): Promise<number | null> {
   const [summaryText, participantsText] = await Promise.all([
@@ -142,6 +142,12 @@ export function ingestRaceFromText(summaryText: string, participantsText: string
   // processing the next event.
   const latest = getLatestEvent()
   if (latest) void maybePostEventToChat(latest)
+  // Noah's ask: a separate toggle to post !lastmap's info automatically
+  // after every race. Race-mode only (matches !lastmap's own scope) — hooked
+  // in here specifically, not tilt.ts/royale.ts, which don't have a "map"
+  // the same way. Gated on latest.kind === 'race' defensively (should always
+  // be true right here, but explicit beats assumed).
+  if (latest && latest.kind === 'race') void maybePostLastMapToChat(latest.occurredAt)
 
   return raceEventId
 }

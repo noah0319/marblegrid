@@ -6,13 +6,12 @@ import {
   getRacerDisplayName
 } from '../db/queries/racerStats.ts'
 import { getTodayLeaderboard, getLeaderboard } from '../db/queries/leaderboard.ts'
-import { getMapRecords, getLastPlayedMap } from '../db/queries/mapRecords.ts'
-import { getMapCommunityStats } from '../db/queries/mapCommunity.ts'
+import { getMapRecords, getLastMapSummary } from '../db/queries/mapRecords.ts'
 import { getMapNotes } from '../db/queries/mapNotes.ts'
-import { mapKey } from '../db/queries/mapKey.ts'
 import { getSeasonStats, getSeasonRaceHighScore } from '../db/queries/stats.ts'
 import { getOpenSeasonId } from '../db/queries/seasons.ts'
 import { getAppSettings } from '../appSettingsStore.ts'
+import { buildLastMapMessage } from './messageTemplates.ts'
 import { formatFullNumber, formatSeconds } from '../../../shared/format.ts'
 
 // Twitch caps chat messages at 500 characters — same constraint buildChatMessage
@@ -195,24 +194,14 @@ function ghostBalls(args: string): string {
 /**
  * Noah's ask: "the last map played along with death percentage, avg time,
  * etc." Race mode only, same scope as Ghost Balls/Community — Tilt/Royale
- * don't have a "map" the same way. Reuses getMapCommunityStats/getMapRecords
- * rather than re-deriving the same aggregation logic here.
+ * don't have a "map" the same way. getLastMapSummary + buildLastMapMessage
+ * are shared with the auto-post-after-each-race toggle (chatPoster.ts) so
+ * the command and the automatic version can never show different numbers.
  */
 function lastMap(): string {
-  const last = getLastPlayedMap()
-  if (!last) return 'No maps played yet.'
-
-  const key = mapKey(last.mapName, last.mapCreator)
-  const community = getMapCommunityStats().find((m) => mapKey(m.mapName, m.mapCreator) === key)
-  const record = getMapRecords().find((m) => mapKey(m.mapName, m.mapCreator) === key)
-
-  const deathRate = community ? `${community.deathRatePercent.toFixed(0)}% death rate` : 'no death rate data'
-  const avgTime =
-    community?.avgFinishSeconds != null ? `avg finish ${formatSeconds(community.avgFinishSeconds)}` : 'no finishes yet'
-  const played = community ? `played ${community.raceCount}x` : ''
-  const recordPart = record ? ` — Ghost Ball ${formatSeconds(record.timeSeconds)} by ${record.racerName}` : ''
-
-  return `🗺️ Last map: ${last.mapName} (${last.mapCreator}) — ${deathRate}, ${avgTime}, ${played}${recordPart}.`
+  const summary = getLastMapSummary()
+  if (!summary) return 'No maps played yet.'
+  return buildLastMapMessage(summary)
 }
 
 /**

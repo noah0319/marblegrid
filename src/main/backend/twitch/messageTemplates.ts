@@ -1,5 +1,6 @@
 import type { LatestEventSummary } from '../../../shared/types.ts'
 import type { WorldRecordBroken } from '../watcher/parsers/customMapPlayed.ts'
+import type { LastMapSummary } from '../db/queries/mapRecords.ts'
 import { formatFullNumber, formatSeconds } from '../../../shared/format.ts'
 
 const RESULTS_LABEL: Record<LatestEventSummary['kind'], string> = {
@@ -78,6 +79,21 @@ export function buildWorldRecordMessage(record: WorldRecordBroken): string {
     `🌍💥 WORLD RECORD! ${record.recordHolderName} just SHATTERED the record on ${record.mapName} — ${time}!` +
     ` (previous: ${previousTime}, held by ${record.previousRecordHolderName})${pointsPart} 🏆`
   )
+}
+
+/**
+ * Shared by !lastmap (the chat command) and the auto-post-after-each-race
+ * toggle — identical wording either way, only the trigger differs (someone
+ * typing the command vs. firing automatically once a race commits).
+ */
+export function buildLastMapMessage(summary: LastMapSummary): string {
+  const { mapName, mapCreator, community, record } = summary
+  const deathRate = community ? `${community.deathRatePercent.toFixed(0)}% death rate` : 'no death rate data'
+  const avgTime =
+    community?.avgFinishSeconds != null ? `avg finish ${formatSeconds(community.avgFinishSeconds)}` : 'no finishes yet'
+  const played = community ? `played ${community.raceCount}x` : ''
+  const recordPart = record ? ` — Ghost Ball ${formatSeconds(record.timeSeconds)} by ${record.racerName}` : ''
+  return `🗺️ Last map: ${mapName} (${mapCreator}) — ${deathRate}, ${avgTime}, ${played}${recordPart}.`
 }
 
 export const TEST_POST_MESSAGE = '[MarbleGrid test message — confirms chat posting works. Ignore.]'
