@@ -4,6 +4,8 @@ import { getTodayBoundaryRangeUtc } from '../../../../shared/dayBoundary.ts'
 export interface RacerTodayStats {
   racesPlayed: number
   totalPoints: number
+  /** Noah's ask: show wins in !myballs/!mystats too, not just the separate !mywins command. Computed in the same query rather than a second roundtrip. */
+  wins: number
 }
 
 /**
@@ -22,7 +24,8 @@ export function getRacerTodayStats(username: string, dayBoundaryHour: number, no
     .prepare(
       `SELECT
          COUNT(DISTINCT re.id) as racesPlayed,
-         COALESCE(SUM(rp.season_points_earned), 0) as totalPoints
+         COALESCE(SUM(rp.season_points_earned), 0) as totalPoints,
+         COALESCE(SUM(CASE WHEN rp.position = 1 THEN 1 ELSE 0 END), 0) as wins
        FROM race_participants rp
        JOIN race_events re ON re.id = rp.race_event_id
        JOIN racers r ON r.id = rp.racer_id
@@ -36,17 +39,21 @@ export function getRacerTodayStats(username: string, dayBoundaryHour: number, no
 export interface RacerSeasonStats {
   racesPlayed: number
   totalPoints: number
+  /** Same value getRacerSeasonWins/!mywins reports — computed here too so !mystats needs only one query per scope instead of two. */
+  wins: number
 }
 
 /**
- * Season totals for one racer — points earned and races played, scoped the
- * same way as the Leaderboard/getRacerSeasonWins (re.season_id IS ?, so a
- * null seasonId correctly covers the bootstrap case too). Powers !mystats'
- * season line and points-per-race; deliberately a SEPARATE query from
- * getRacerTodayStats rather than reusing its window, since "today" and
+ * Season totals for one racer — points earned, races played, and wins,
+ * scoped the same way as the Leaderboard/getRacerSeasonWins (re.season_id
+ * IS ?, so a null seasonId correctly covers the bootstrap case too). Powers
+ * !mystats' season line and points-per-race; deliberately a SEPARATE query
+ * from getRacerTodayStats rather than reusing its window, since "today" and
  * "season" are genuinely independent scopes — today's boundary can roll
  * over mid-season, and a racer's season total must not silently reset with
- * it.
+ * it. getRacerSeasonWins stays a separate standalone function (still powers
+ * !mywins on its own) rather than being refactored to share this one — no
+ * reason to touch an already-correct, independent command.
  */
 export function getRacerSeasonStats(username: string, seasonId: number | null): RacerSeasonStats {
   const db = getDb()
@@ -54,7 +61,8 @@ export function getRacerSeasonStats(username: string, seasonId: number | null): 
     .prepare(
       `SELECT
          COUNT(DISTINCT re.id) as racesPlayed,
-         COALESCE(SUM(rp.season_points_earned), 0) as totalPoints
+         COALESCE(SUM(rp.season_points_earned), 0) as totalPoints,
+         COALESCE(SUM(CASE WHEN rp.position = 1 THEN 1 ELSE 0 END), 0) as wins
        FROM race_participants rp
        JOIN race_events re ON re.id = rp.race_event_id
        JOIN racers r ON r.id = rp.racer_id

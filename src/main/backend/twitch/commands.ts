@@ -114,10 +114,14 @@ function myStats(args: string, ctx: ChatCommandContext): string {
   const season = getRacerSeasonStats(target.username, getOpenSeasonId())
   const todayRaceWord = today.racesPlayed === 1 ? 'race' : 'races'
   const seasonRaceWord = season.racesPlayed === 1 ? 'race' : 'races'
+  const todayWinWord = today.wins === 1 ? 'win' : 'wins'
+  const seasonWinWord = season.wins === 1 ? 'win' : 'wins'
   const ppr = season.racesPlayed > 0 ? season.totalPoints / season.racesPlayed : 0
+  // Noah's ask: show wins too, not just points/races/PPR — both scopes, same
+  // parallel Today/Season structure this reply already used.
   return (
-    `@${target.displayName}: Today: ${formatFullNumber(today.totalPoints)} pts (${today.racesPlayed} ${todayRaceWord}) | ` +
-    `Season: ${formatFullNumber(season.totalPoints)} pts, ${season.racesPlayed} ${seasonRaceWord}, ${formatFullNumber(ppr)} PPR.`
+    `@${target.displayName}: Today: ${formatFullNumber(today.totalPoints)} pts (${today.racesPlayed} ${todayRaceWord}, ${today.wins} ${todayWinWord}) | ` +
+    `Season: ${formatFullNumber(season.totalPoints)} pts, ${season.racesPlayed} ${seasonRaceWord}, ${season.wins} ${seasonWinWord}, ${formatFullNumber(ppr)} PPR.`
   )
 }
 

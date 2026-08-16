@@ -74,13 +74,14 @@ test('!myballs username (no @) also works', () => {
   assert.match(reply ?? '', /^@schoklad:/)
 })
 
-test('!mystats reports today AND season stats (points, races, PPR), using the real fixture', () => {
+test('!mystats reports today AND season stats (points, races, wins, PPR), using the real fixture', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
   const reply = handleChatCommand('!mystats', ctx())
   // Only one race exists in this test, so today and season are identical
   // here by coincidence, not because they're the same query — see the
   // dedicated "can differ" test below for proof they're independent scopes.
-  assert.equal(reply, '@schoklad: Today: 4,602 pts (1 race) | Season: 4,602 pts, 1 race, 4,602 PPR.')
+  // schoklad is the real winner (position 1) in this fixture — 1 win.
+  assert.equal(reply, '@schoklad: Today: 4,602 pts (1 race, 1 win) | Season: 4,602 pts, 1 race, 1 win, 4,602 PPR.')
 })
 
 test('!mystats resolves the chatter to a racer case-insensitively', () => {
@@ -88,7 +89,8 @@ test('!mystats resolves the chatter to a racer case-insensitively', () => {
   // Twitch reports the chatter's login as "RahHerself" here; the racers
   // table has it lowercase ("rahherself") from the CSV's Username column.
   const reply = handleChatCommand('!mystats', ctx({ chatterName: 'RahHerself', chatterDisplayName: 'RahHerself' }))
-  assert.equal(reply, '@RahHerself: Today: 4,234 pts (1 race) | Season: 4,234 pts, 1 race, 4,234 PPR.')
+  // RahHerself finished 2nd in the real fixture — 0 wins, not the winner.
+  assert.equal(reply, '@RahHerself: Today: 4,234 pts (1 race, 0 wins) | Season: 4,234 pts, 1 race, 0 wins, 4,234 PPR.')
 })
 
 test('!mystats is friendly to someone who has never raced, not a crash or a bare zero', () => {
@@ -104,14 +106,14 @@ test("!mystats season stats CAN differ from today's — they're independent scop
   // still includes it.
   const farFuture = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   const reply = handleChatCommand('!mystats', ctx({ now: farFuture }))
-  assert.match(reply ?? '', /Today: 0 pts \(0 races\)/)
-  assert.match(reply ?? '', /Season: 4,602 pts, 1 race, 4,602 PPR/)
+  assert.match(reply ?? '', /Today: 0 pts \(0 races, 0 wins\)/)
+  assert.match(reply ?? '', /Season: 4,602 pts, 1 race, 1 win, 4,602 PPR/)
 })
 
 test('!mystats @username looks up someone elses stats, not the callers own', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // includes schoklad and RahHerself
   const reply = handleChatCommand('!mystats @RahHerself', ctx({ chatterId: 'caller', chatterName: 'schoklad', chatterDisplayName: 'schoklad' }))
-  assert.equal(reply, '@RahHerself: Today: 4,234 pts (1 race) | Season: 4,234 pts, 1 race, 4,234 PPR.')
+  assert.equal(reply, '@RahHerself: Today: 4,234 pts (1 race, 0 wins) | Season: 4,234 pts, 1 race, 0 wins, 4,234 PPR.')
 })
 
 test('!mystats username also works without the leading @', () => {

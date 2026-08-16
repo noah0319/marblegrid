@@ -456,8 +456,8 @@ export default function Settings(): React.JSX.Element {
             <ul className="settings__commands">
               <li>
                 <span className="settings__mono">!mystats</span>, <span className="settings__mono">!mymarble</span>, or{' '}
-                <span className="settings__mono">!myballs</span> — today&apos;s points/races plus season points,
-                season races, and points-per-race (PPR)
+                <span className="settings__mono">!myballs</span> — today&apos;s points/races/wins plus season
+                points, season races, season wins, and points-per-race (PPR)
               </li>
               <li>
                 <span className="settings__mono">!mywins</span> — wins this season
