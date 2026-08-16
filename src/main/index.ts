@@ -8,6 +8,7 @@ import { initSettingsStore } from './backend/twitch/settingsStore.ts'
 import { initAppSettingsStore } from './backend/appSettingsStore.ts'
 import { isConnected } from './backend/twitch/auth.ts'
 import { startChatListener } from './backend/twitch/chatListener.ts'
+import { initAutoUpdater } from './updater.ts'
 import { SERVER_PORT } from '../shared/constants.ts'
 
 let mainWindow: BrowserWindow | null = null
@@ -118,6 +119,9 @@ if (!gotLock) {
       await startServer(SERVER_PORT)
       createWindow()
       createTray()
+      // Only in a real packaged install — dev mode has no published feed to
+      // check against, and electron-updater isn't meant to run there.
+      if (app.isPackaged) initAutoUpdater()
     } catch (err) {
       // A silent startup failure (this is exactly what happened before this
       // fix: a port conflict threw here, nothing caught it, and the app sat
