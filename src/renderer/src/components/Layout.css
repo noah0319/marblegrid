@@ -101,6 +101,36 @@
   color: var(--text-primary);
 }
 
+.update-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.update-banner__install {
+  flex-shrink: 0;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  color: #0a0a0f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: box-shadow var(--duration-base) var(--ease-standard);
+}
+
+.update-banner__install:hover:not(:disabled) {
+  box-shadow: var(--shadow-glow-accent);
+}
+
+.update-banner__install:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .update-banner__dismiss {
   flex-shrink: 0;
   background: transparent;
@@ -116,7 +146,12 @@
     background var(--duration-base) var(--ease-standard);
 }
 
-.update-banner__dismiss:hover {
+.update-banner__dismiss:hover:not(:disabled) {
   color: var(--text-primary);
   background: var(--surface-card-hover);
+}
+
+.update-banner__dismiss:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

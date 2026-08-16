@@ -31,7 +31,7 @@ import {
 import { sendTestPost } from './twitch/chatPoster.ts'
 import { buildChatMessage } from './twitch/messageTemplates.ts'
 import { startChatListener, stopChatListener, isChatListenerActive } from './twitch/chatListener.ts'
-import { getUpdateReadyVersion } from '../updater.ts'
+import { getUpdateReadyVersion, installUpdateNow } from '../updater.ts'
 import type { TwitchStatus, TodayStats } from '../../shared/types.ts'
 
 /**
@@ -79,6 +79,24 @@ export async function startServer(port: number): Promise<void> {
       // window was closed (tray-resident app, so that's a real case).
       updateReadyVersion: getUpdateReadyVersion()
     })
+  })
+
+  // Real report (2026-08-16): relying on people to discover "right-click
+  // tray icon -> Quit" to actually apply a downloaded update isn't
+  // reliable — someone Task-Managered the app instead, which skips the
+  // graceful quit sequence entirely, and stayed on the old version
+  // indefinitely. This gives the update-ready banner's button a
+  // deterministic path instead of hoping. Respond BEFORE quitting — the
+  // process is about to exit, so the renderer's fetch() needs to see a
+  // real 200 first, not a dropped connection it can't tell apart from a
+  // real failure.
+  app.post('/api/update/install-now', (_req, res) => {
+    if (!getUpdateReadyVersion()) {
+      res.status(400).json({ error: 'No update is ready to install.' })
+      return
+    }
+    res.json({ ok: true })
+    setTimeout(() => installUpdateNow(), 150)
   })
 
   // Real stats routes — Phase 2. Day-boundary hour is now a real per-user

@@ -9,11 +9,11 @@ import { initAppSettingsStore } from './backend/appSettingsStore.ts'
 import { isConnected } from './backend/twitch/auth.ts'
 import { startChatListener } from './backend/twitch/chatListener.ts'
 import { initAutoUpdater } from './updater.ts'
+import { markQuitting, isQuitting } from './appLifecycle.ts'
 import { SERVER_PORT } from '../shared/constants.ts'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
-let quitting = false
 
 // build/icon.ico is the app's real logo (Noah's marble-in-a-grid render —
 // see 06 Attachments/ for the source and tools/build-icon.mjs for how the
@@ -46,7 +46,7 @@ function createWindow(): void {
   // while nothing is watching is lost the instant the game overwrites the
   // file). Only the tray's "Quit MarbleGrid" really exits.
   mainWindow.on('close', (event) => {
-    if (!quitting) {
+    if (!isQuitting()) {
       event.preventDefault()
       mainWindow?.hide()
     }
@@ -69,7 +69,7 @@ function createTray(): void {
       {
         label: 'Quit MarbleGrid',
         click: () => {
-          quitting = true
+          markQuitting()
           app.quit()
         }
       }
@@ -102,6 +102,18 @@ if (!gotLock) {
   // poster) needs to keep running for the whole stream regardless of whether
   // the companion window is open.
   app.on('window-all-closed', () => {})
+
+  // Belt-and-suspenders alongside the tray menu's markQuitting() call:
+  // catches any OTHER real quit path (Windows shutdown/logoff sends
+  // app.quit() too, and this project doesn't want to enumerate every way
+  // that could happen) so the window's close handler never mistakes a
+  // genuine quit for a stray close-button click. Not sufficient on its own
+  // for quitAndInstall() specifically — see appLifecycle.ts and
+  // updater.ts's installUpdateNow(), which sets this proactively instead of
+  // relying on 'before-quit' timing for that path.
+  app.on('before-quit', () => {
+    markQuitting()
+  })
 
   app.whenReady().then(async () => {
     try {
