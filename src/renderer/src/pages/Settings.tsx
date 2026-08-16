@@ -38,6 +38,7 @@ export default function Settings(): React.JSX.Element {
   const [boundaryHour, setBoundaryHour] = useState('6')
   const [boundarySaving, setBoundarySaving] = useState(false)
   const [boundarySaved, setBoundarySaved] = useState(false)
+  const [quitting, setQuitting] = useState(false)
 
   // Local editable field only takes the fetched value once it actually
   // arrives — otherwise it'd stomp whatever Noah's mid-typing the moment the
@@ -227,6 +228,22 @@ export default function Settings(): React.JSX.Element {
     } finally {
       setPreviewing(false)
     }
+  }
+
+  // Noah's ask, after someone struggled to find the tray icon at all: a
+  // direct "fully quit" button that doesn't depend on finding a small icon
+  // in the notification area. A real confirm dialog, not just a click-and-
+  // go — unlike the X button (which just hides the window), this one
+  // genuinely stops the file watcher too, and this app's whole reason for
+  // existing is that a race landing while nothing's watching is lost for
+  // good. Worth one extra click to guard against a misclick mid-stream.
+  async function quitApp(): Promise<void> {
+    if (!window.confirm('Fully close MarbleGrid, including race tracking in the background? Only do this if you\'re done for now, or an update needs to finish installing.')) {
+      return
+    }
+    setQuitting(true)
+    await fetch(`${BASE}/api/app/quit`, { method: 'POST' })
+    // No further state update needed — the app is about to quit for real.
   }
 
   return (
@@ -560,6 +577,21 @@ export default function Settings(): React.JSX.Element {
           Hides the BR HS tile on the Dashboard and the Daily Stats overlay — handy if you don&apos;t run Battle
           Royale mode and don&apos;t want an always-zero stat taking up space. On by default.
         </p>
+      </section>
+
+      <section className="settings__card">
+        <h2 className="settings__card-title">Application</h2>
+        <p className="settings__hint">
+          MarbleGrid keeps running in the system tray after you close this window — that&apos;s intentional, so
+          race tracking never stops just because the window&apos;s closed. Use this instead of Task Manager
+          whenever you actually want it fully closed (for the day, or to finish installing an update) — Task
+          Manager skips the shutdown steps this needs and can leave an update stuck downloaded but never applied.
+        </p>
+        <div className="settings__actions">
+          <button type="button" className="settings__btn" disabled={quitting} onClick={() => void quitApp()}>
+            {quitting ? 'Closing…' : 'Quit MarbleGrid'}
+          </button>
+        </div>
       </section>
     </div>
   )

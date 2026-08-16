@@ -32,6 +32,7 @@ import { sendTestPost } from './twitch/chatPoster.ts'
 import { buildChatMessage } from './twitch/messageTemplates.ts'
 import { startChatListener, stopChatListener, isChatListenerActive } from './twitch/chatListener.ts'
 import { getUpdateReadyVersion, installUpdateNow } from '../updater.ts'
+import { markQuitting } from '../appLifecycle.ts'
 import type { TwitchStatus, TodayStats } from '../../shared/types.ts'
 
 /**
@@ -97,6 +98,21 @@ export async function startServer(port: number): Promise<void> {
     }
     res.json({ ok: true })
     setTimeout(() => installUpdateNow(), 150)
+  })
+
+  // Noah's ask, after watching someone struggle to find the tray icon at
+  // all: a direct "fully quit" button inside the app itself, not dependent
+  // on finding a small icon in the notification area. Same graceful path
+  // as the tray's own Quit item (markQuitting() before app.quit(), so the
+  // main window's close handler doesn't just hide it again) — this is a
+  // real, clean shutdown, not a Task-Manager-style kill. Respond before
+  // quitting, same reasoning as install-now above.
+  app.post('/api/app/quit', (_req, res) => {
+    res.json({ ok: true })
+    setTimeout(() => {
+      markQuitting()
+      electronApp.quit()
+    }, 150)
   })
 
   // Real stats routes — Phase 2. Day-boundary hour is now a real per-user
