@@ -8,7 +8,8 @@ import { RaceSummarySchema, RaceParticipantSchema } from '../../../../shared/typ
 import { MARBLES_SAVE_DIR } from '../paths.ts'
 import { broadcast } from '../../ws.ts'
 import { getLatestEvent } from '../../db/queries/latestEvent.ts'
-import { maybePostEventToChat, maybePostLastMapToChat } from '../../twitch/chatPoster.ts'
+import { maybePostEventToChat, maybePostLastMapToChat, maybePostSeasonRecordToChat } from '../../twitch/chatPoster.ts'
+import { findSeasonRecordBreak } from '../../db/queries/mapRecords.ts'
 
 export async function ingestRaceFiles(dir: string = MARBLES_SAVE_DIR): Promise<number | null> {
   const [summaryText, participantsText] = await Promise.all([
@@ -68,6 +69,7 @@ export function ingestRaceFromText(summaryText: string, participantsText: string
   if (already) return already.id
 
   const seasonId = getOpenSeasonId()
+  const capturedAtLocal = new Date().toISOString()
   let raceEventId: number
 
   db.exec('BEGIN')
@@ -85,7 +87,7 @@ export function ingestRaceFromText(summaryText: string, participantsText: string
         summary.SnapshotId,
         summary.SchemaVersion,
         summary.GeneratedAtUtc,
-        new Date().toISOString(),
+        capturedAtLocal,
         summary.Status,
         summary.GameMode,
         summary.SessionType,
@@ -148,6 +150,15 @@ export function ingestRaceFromText(summaryText: string, participantsText: string
   // the same way. Gated on latest.kind === 'race' defensively (should always
   // be true right here, but explicit beats assumed).
   if (latest && latest.kind === 'race') void maybePostLastMapToChat(latest.occurredAt)
+
+  // Noah's ask (2026-08-19): an instant, honestly-scoped "season record"
+  // alert alongside the game-file-dependent world-record one — see
+  // findSeasonRecordBreak's doc comment. Checked here specifically (not a
+  // general per-map hook) because it only ever needs to ask "did the race
+  // that JUST committed change anything," not re-derive the whole map's
+  // history. Race mode only, same scope as everything else map-related.
+  const seasonRecord = findSeasonRecordBreak(raceEventId, summary.MapName, summary.MapCreator, seasonId)
+  if (seasonRecord) void maybePostSeasonRecordToChat(seasonRecord, capturedAtLocal)
 
   return raceEventId
 }

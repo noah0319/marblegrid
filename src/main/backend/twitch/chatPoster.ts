@@ -1,8 +1,8 @@
 import { getDb } from '../db/db.ts'
 import { getSettings } from './settingsStore.ts'
 import { getBroadcasterUserId, sendChatMessageAsConfigured } from './auth.ts'
-import { buildChatMessage, buildWorldRecordMessage, buildLastMapMessage, TEST_POST_MESSAGE } from './messageTemplates.ts'
-import { getLastMapSummary, type LastMapSummary } from '../db/queries/mapRecords.ts'
+import { buildChatMessage, buildWorldRecordMessage, buildLastMapMessage, buildSeasonRecordMessage, TEST_POST_MESSAGE } from './messageTemplates.ts'
+import { getLastMapSummary, type LastMapSummary, type SeasonRecordBroken } from '../db/queries/mapRecords.ts'
 import type { LatestEventSummary } from '../../../shared/types.ts'
 import type { WorldRecordBroken } from '../watcher/parsers/customMapPlayed.ts'
 
@@ -156,6 +156,75 @@ async function sendWorldRecordWithRetry(
        ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
          attempted_at = excluded.attempted_at, success = 0, message = excluded.message, error = excluded.error`
     ).run(identity, new Date().toISOString(), message, errorMessage)
+    return { attempted: true, success: false, error: errorMessage }
+  }
+}
+
+/**
+ * Noah's ask: an instant, honestly-scoped companion to maybePostWorldRecordToChat
+ * — see findSeasonRecordBreak's doc comment for the full "why." Same
+ * auto-post gate (reuses autoPostEnabled, not a separate toggle — matches
+ * how world-record posting already piggybacks on the same setting rather
+ * than adding a dedicated one) and retry-once/restart-safe dedupe policy,
+ * same chat_post_log table with its own event_kind. Identity is the
+ * triggering race's own occurredAt (matches maybePostLastMapToChat's
+ * pattern) rather than derived from the record values themselves — this is
+ * tied to one specific race event, not a standalone fact like a world
+ * record is.
+ */
+export async function maybePostSeasonRecordToChat(
+  record: SeasonRecordBroken,
+  occurredAt: string,
+  sendFn: SendFn = defaultSend
+): Promise<ChatPostResult> {
+  const settings = getSettings()
+  if (!settings.autoPostEnabled) return { attempted: false, success: false }
+
+  const broadcasterId = getBroadcasterUserId()
+  if (!broadcasterId) return { attempted: false, success: false, error: 'Twitch is not connected' }
+
+  const db = getDb()
+  const alreadyPosted = db
+    .prepare(`SELECT 1 FROM chat_post_log WHERE event_kind = 'season_record' AND event_occurred_at = ? AND success = 1`)
+    .get(occurredAt)
+  if (alreadyPosted) return { attempted: false, success: false }
+
+  return sendSeasonRecordWithRetry(record, occurredAt, broadcasterId, sendFn, 1)
+}
+
+async function sendSeasonRecordWithRetry(
+  record: SeasonRecordBroken,
+  occurredAt: string,
+  broadcasterId: string,
+  sendFn: SendFn,
+  retriesLeft: number
+): Promise<ChatPostResult> {
+  const db = getDb()
+  const message = buildSeasonRecordMessage(record)
+
+  try {
+    await sendFn(broadcasterId, message)
+    db.prepare(
+      `INSERT INTO chat_post_log (event_kind, event_occurred_at, attempted_at, success, message, error)
+       VALUES ('season_record', ?, ?, 1, ?, NULL)
+       ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
+         attempted_at = excluded.attempted_at, success = 1, message = excluded.message, error = NULL`
+    ).run(occurredAt, new Date().toISOString(), message)
+    return { attempted: true, success: true, message }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+
+    if (retriesLeft > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      return sendSeasonRecordWithRetry(record, occurredAt, broadcasterId, sendFn, retriesLeft - 1)
+    }
+
+    db.prepare(
+      `INSERT INTO chat_post_log (event_kind, event_occurred_at, attempted_at, success, message, error)
+       VALUES ('season_record', ?, ?, 0, ?, ?)
+       ON CONFLICT(event_kind, event_occurred_at) DO UPDATE SET
+         attempted_at = excluded.attempted_at, success = 0, message = excluded.message, error = excluded.error`
+    ).run(occurredAt, new Date().toISOString(), message, errorMessage)
     return { attempted: true, success: false, error: errorMessage }
   }
 }

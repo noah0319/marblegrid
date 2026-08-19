@@ -3,9 +3,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { initDb, closeDb } from '../src/main/backend/db/db.ts'
+import { initDb, closeDb, getDb } from '../src/main/backend/db/db.ts'
 import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
-import { getMapRecords, setMapRecordOverride, clearMapRecordOverride } from '../src/main/backend/db/queries/mapRecords.ts'
+import { getMapRecords, setMapRecordOverride, clearMapRecordOverride, findSeasonRecordBreak } from '../src/main/backend/db/queries/mapRecords.ts'
+import { getOpenSeasonId } from '../src/main/backend/db/queries/seasons.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURES_DIR = join(__dirname, 'fixtures')
@@ -290,4 +291,133 @@ test('setting a second override for the same map REPLACES the first rather than 
   assert.equal(records.length, 1)
   assert.equal(records[0]?.racerName, 'CorrectedGuess')
   assert.equal(records[0]?.timeSeconds, 45)
+})
+
+// --- findSeasonRecordBreak — the instant, local, season-scoped companion
+// to the game-file-dependent world-record feature (Noah's ask, 2026-08-19,
+// after confirming other community tools announce a per-season local best,
+// not the game's verified global record).
+
+test("a map's very first race THIS season fires a season record with no previous holder", () => {
+  const raceEventId = ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const broken = findSeasonRecordBreak(raceEventId!, 'feel the fire', 'zim2325', getOpenSeasonId())
+  assert.ok(broken)
+  assert.equal(broken?.racerName, 'schoklad')
+  assert.equal(broken?.timeSeconds, 133.391144)
+  assert.equal(broken?.previousTimeSeconds, null)
+  assert.equal(broken?.previousRacerName, null)
+})
+
+test('a genuinely faster second race THIS season fires again, correctly naming the previous holder', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad, 133.391144s
+  const faster = syntheticRace({
+    snapshotId: 'sr-faster-1',
+    mapName: 'feel the fire',
+    winnerTime: 120,
+    winnerName: 'FastRacer'
+  })
+  const raceEventId = ingestRaceFromText(faster.summary, faster.participants)
+
+  const broken = findSeasonRecordBreak(raceEventId!, 'feel the fire', 'zim2325', getOpenSeasonId())
+  assert.ok(broken)
+  assert.equal(broken?.racerName, 'FastRacer')
+  assert.equal(broken?.timeSeconds, 120)
+  assert.equal(broken?.previousTimeSeconds, 133.391144)
+  assert.equal(broken?.previousRacerName, 'schoklad')
+})
+
+test('a slower second race THIS season does not fire', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad, 133.391144s
+  const slower = syntheticRace({
+    snapshotId: 'sr-slower-1',
+    mapName: 'feel the fire',
+    winnerTime: 200,
+    winnerName: 'SlowRacer'
+  })
+  const raceEventId = ingestRaceFromText(slower.summary, slower.participants)
+
+  const broken = findSeasonRecordBreak(raceEventId!, 'feel the fire', 'zim2325', getOpenSeasonId())
+  assert.equal(broken, null)
+})
+
+test('an exact tie does not fire — must be genuinely faster, not equal', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad, 133.391144s
+  const tie = syntheticRace({
+    snapshotId: 'sr-tie-1',
+    mapName: 'feel the fire',
+    winnerTime: 133.391144,
+    winnerName: 'TieRacer'
+  })
+  const raceEventId = ingestRaceFromText(tie.summary, tie.participants)
+
+  const broken = findSeasonRecordBreak(raceEventId!, 'feel the fire', 'zim2325', getOpenSeasonId())
+  assert.equal(broken, null)
+})
+
+test("Noah's exact real-world case: a slower time than an all-time Ghost Ball from a PAST season still fires, because it's this season's first race on the map", () => {
+  // Race 1: bootstrap/null season, fast time — becomes the all-time Ghost
+  // Ball for this map (getMapRecords is deliberately all-time, un-scoped).
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // schoklad, 133.391144s, season_id NULL
+
+  // Open a real season now (mirrors a genuine season rollover happening
+  // between the two races).
+  const db = getDb()
+  db.exec(`INSERT INTO seasons (season_number, source, started_at) VALUES (99, 'manual_override', '2026-01-01T00:00:00.000Z')`)
+  const newSeasonId = getOpenSeasonId()
+  assert.ok(newSeasonId, 'a real season must now be open')
+
+  // Race 2: same map, THIS new season, SLOWER than the all-time Ghost Ball.
+  const slowerButNewSeason = syntheticRace({
+    snapshotId: 'sr-new-season-1',
+    mapName: 'feel the fire',
+    winnerTime: 150, // slower than schoklad's all-time 133.39s
+    winnerName: 'ThisSeasonsRacer'
+  })
+  const raceEventId = ingestRaceFromText(slowerButNewSeason.summary, slowerButNewSeason.participants)
+
+  // getMapRecords (all-time) must still show the OLD, faster Ghost Ball —
+  // confirms this test isn't accidentally changing that feature's behavior.
+  const allTime = getMapRecords().find((r) => r.mapName === 'feel the fire')
+  assert.equal(allTime?.racerName, 'schoklad')
+
+  // But the SEASON record check must fire anyway — first race THIS season,
+  // regardless of what happened in a season that's already over.
+  const broken = findSeasonRecordBreak(raceEventId!, 'feel the fire', 'zim2325', newSeasonId)
+  assert.ok(broken, 'must fire even though slower than the all-time Ghost Ball, since this season has no prior race on this map yet')
+  assert.equal(broken?.racerName, 'ThisSeasonsRacer')
+  assert.equal(broken?.timeSeconds, 150)
+  assert.equal(broken?.previousTimeSeconds, null)
+})
+
+test('an eliminated racer\'s short survival time never counts as a season record, same rule as the all-time Ghost Ball', () => {
+  const snapshotId = 'sr-elim-1'
+  const summary =
+    `SchemaVersion,SnapshotId,GeneratedAtUtc,Status,GameMode,SessionType,MapName,MapCreator,PlayerCount,FinishedCount,EliminatedCount,WinnerPlatform,WinnerUsername\n` +
+    `4,${snapshotId},2026-08-10T16:59:03.229Z,Final,Custom Map Race,Qualifying,brand new map,zim2325,2,1,1,Twitch,RealFinisher\n`
+  const participants =
+    `SnapshotId,Position,Username,DisplayName,Platform,NameColorHex,SeasonPointsEarned,SeasonPointsTotal,SeasonWinsTotal,SeasonMatchesPlayedTotal,TimeInRaceSeconds,Eliminated\n` +
+    `${snapshotId},1,realfinisher,RealFinisher,Twitch,FFFFFFFF,4000,4000,1,1,133.000000,false\n` +
+    `${snapshotId},2,gotknockedout,GotKnockedOut,Twitch,FFFFFFFF,0,0,0,1,12.000000,true\n`
+  const raceEventId = ingestRaceFromText(summary, participants)
+
+  const broken = findSeasonRecordBreak(raceEventId!, 'brand new map', 'zim2325', getOpenSeasonId())
+  assert.ok(broken)
+  assert.equal(broken?.racerName, 'RealFinisher', "must not pick the eliminated racer's 12s survival time")
+  assert.equal(broken?.timeSeconds, 133)
+})
+
+test('season records are tracked independently per map', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // "feel the fire"
+  const otherMap = syntheticRace({
+    snapshotId: 'sr-other-map-1',
+    mapName: 'a totally different map',
+    winnerTime: 45,
+    winnerName: 'OtherMapRacer'
+  })
+  const raceEventId = ingestRaceFromText(otherMap.summary, otherMap.participants)
+
+  const broken = findSeasonRecordBreak(raceEventId!, 'a totally different map', 'zim2325', getOpenSeasonId())
+  assert.ok(broken)
+  assert.equal(broken?.racerName, 'OtherMapRacer')
+  assert.equal(broken?.previousTimeSeconds, null, "a different map's history must not leak in")
 })

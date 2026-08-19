@@ -1,6 +1,6 @@
 import type { LatestEventSummary } from '../../../shared/types.ts'
 import type { WorldRecordBroken } from '../watcher/parsers/customMapPlayed.ts'
-import type { LastMapSummary } from '../db/queries/mapRecords.ts'
+import type { LastMapSummary, SeasonRecordBroken } from '../db/queries/mapRecords.ts'
 import { formatFullNumber, formatSeconds } from '../../../shared/format.ts'
 
 const RESULTS_LABEL: Record<LatestEventSummary['kind'], string> = {
@@ -79,6 +79,22 @@ export function buildWorldRecordMessage(record: WorldRecordBroken): string {
     `🌍💥 WORLD RECORD! ${record.recordHolderName} just SHATTERED the record on ${record.mapName} — ${time}!` +
     ` (previous: ${previousTime}, held by ${record.previousRecordHolderName})${pointsPart} 🏆`
   )
+}
+
+/**
+ * Deliberately says "season record," never "world record" or just "record"
+ * — this is a local/channel best scoped to the current season (see
+ * findSeasonRecordBreak), not verified against the game's own cross-player
+ * data the way buildWorldRecordMessage's feature is. Honest framing on
+ * purpose: exciting, but not overclaiming what it actually checked.
+ */
+export function buildSeasonRecordMessage(record: SeasonRecordBroken): string {
+  const time = formatSeconds(record.timeSeconds)
+  const previousPart =
+    record.previousTimeSeconds !== null && record.previousRacerName
+      ? ` — previous best this season: ${formatSeconds(record.previousTimeSeconds)} by ${record.previousRacerName}`
+      : " — first finish on this map this season!"
+  return `🏆 New season record! ${record.racerName} just posted the fastest time on ${record.mapName} this season — ${time}!${previousPart}`
 }
 
 /**

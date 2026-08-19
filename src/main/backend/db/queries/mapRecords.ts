@@ -148,6 +148,104 @@ export function clearMapRecordOverride(mapName: string, mapCreator: string): voi
   db.prepare(`DELETE FROM map_record_overrides WHERE map_name = ? AND map_creator = ?`).run(mapName, mapCreator)
 }
 
+export interface SeasonRecordBroken {
+  mapName: string
+  mapCreator: string
+  racerName: string
+  timeSeconds: number
+  /** Null when this is the map's first-ever race THIS season — still a real season record, just nothing to compare against. */
+  previousTimeSeconds: number | null
+  previousRacerName: string | null
+}
+
+/**
+ * Noah's ask, from a real investigation into why "world record" alerts
+ * (customMapPlayed.ts, gated on the game's own — often laggy — record
+ * file) sometimes miss or lag: other community tools appear to announce a
+ * SEASON-scoped local best instead of the game's true global record. Noah
+ * confirmed this directly — a run slower than his own all-time Ghost Ball
+ * still got called a record elsewhere, because the faster time was from a
+ * DIFFERENT season. This is that same concept for MarbleGrid: purely local
+ * data (race_participants/race_events, exactly what getMapRecordHistory
+ * already uses for the all-time version), zero dependency on the game's
+ * file or its lag, fires the instant a race commits.
+ *
+ * Deliberately labeled "season record" everywhere (never "world record")
+ * so it's never confused with — or treated as a replacement for — the
+ * actual game-verified feature this sits alongside. Also deliberately DOES
+ * fire on a map's first-ever race this season (previousTimeSeconds null),
+ * unlike the world-record feature's first-sighting rule — Noah confirmed
+ * the apps he's comparing against do this too, and unlike the world-record
+ * case there's no risk of misattributing a stranger's run here: every row
+ * this reads is already a real local race on THIS channel.
+ *
+ * Scoped to ONE map (whichever was just raced) relative to ONE specific
+ * race event, not a full chronological walk — getMapRecordHistory already
+ * covers "show me everything," this covers "did THIS race that just
+ * happened change anything," which is a cheaper, more targeted question to
+ * answer live after every single race.
+ */
+export function findSeasonRecordBreak(
+  raceEventId: number,
+  mapName: string,
+  mapCreator: string,
+  seasonId: number | null
+): SeasonRecordBroken | null {
+  const db = getDb()
+
+  const thisRaceBest = db
+    .prepare(
+      `SELECT rp.time_in_race_seconds as timeSeconds, COALESCE(NULLIF(r.display_name, ''), r.username) as racerName
+       FROM race_participants rp
+       JOIN racers r ON r.id = rp.racer_id
+       WHERE rp.race_event_id = ? AND rp.eliminated = 0
+         AND rp.time_in_race_seconds IS NOT NULL AND rp.time_in_race_seconds > 0
+       ORDER BY rp.time_in_race_seconds ASC LIMIT 1`
+    )
+    .get(raceEventId) as { timeSeconds: number; racerName: string } | undefined
+  if (!thisRaceBest) return null
+
+  const priorBest = db
+    .prepare(
+      `SELECT MIN(rp.time_in_race_seconds) as timeSeconds
+       FROM race_participants rp
+       JOIN race_events re ON re.id = rp.race_event_id
+       WHERE re.map_name = ? COLLATE NOCASE AND re.map_creator = ? COLLATE NOCASE
+         AND re.season_id IS ? AND re.id != ?
+         AND rp.eliminated = 0 AND rp.time_in_race_seconds IS NOT NULL AND rp.time_in_race_seconds > 0`
+    )
+    .get(mapName, mapCreator, seasonId, raceEventId) as { timeSeconds: number | null } | undefined
+
+  const priorTime = priorBest?.timeSeconds ?? null
+  if (priorTime !== null && thisRaceBest.timeSeconds >= priorTime) return null
+
+  let previousRacerName: string | null = null
+  if (priorTime !== null) {
+    const holder = db
+      .prepare(
+        `SELECT COALESCE(NULLIF(r.display_name, ''), r.username) as racerName
+         FROM race_participants rp
+         JOIN race_events re ON re.id = rp.race_event_id
+         JOIN racers r ON r.id = rp.racer_id
+         WHERE re.map_name = ? COLLATE NOCASE AND re.map_creator = ? COLLATE NOCASE
+           AND re.season_id IS ? AND re.id != ?
+           AND rp.eliminated = 0 AND rp.time_in_race_seconds = ?
+         LIMIT 1`
+      )
+      .get(mapName, mapCreator, seasonId, raceEventId, priorTime) as { racerName: string } | undefined
+    previousRacerName = holder?.racerName ?? null
+  }
+
+  return {
+    mapName,
+    mapCreator,
+    racerName: thisRaceBest.racerName,
+    timeSeconds: thisRaceBest.timeSeconds,
+    previousTimeSeconds: priorTime,
+    previousRacerName
+  }
+}
+
 export interface LastPlayedMap {
   mapName: string
   mapCreator: string

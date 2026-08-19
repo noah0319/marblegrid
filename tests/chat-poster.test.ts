@@ -10,12 +10,14 @@ import {
   maybePostEventToChat,
   maybePostWorldRecordToChat,
   maybePostLastMapToChat,
+  maybePostSeasonRecordToChat,
   sendTestPost
 } from '../src/main/backend/twitch/chatPoster.ts'
-import { buildChatMessage, buildWorldRecordMessage } from '../src/main/backend/twitch/messageTemplates.ts'
+import { buildChatMessage, buildWorldRecordMessage, buildSeasonRecordMessage } from '../src/main/backend/twitch/messageTemplates.ts'
 import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
 import type { LatestEventSummary } from '../src/shared/types.ts'
 import type { WorldRecordBroken } from '../src/main/backend/watcher/parsers/customMapPlayed.ts'
+import type { SeasonRecordBroken } from '../src/main/backend/db/queries/mapRecords.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURES_DIR = join(__dirname, 'fixtures')
@@ -294,6 +296,111 @@ test('maybePostWorldRecordToChat retries exactly once on failure, then gives up 
   }
 
   const result = await maybePostWorldRecordToChat(worldRecord, alwaysFails)
+
+  assert.equal(calls, 2)
+  assert.equal(result.success, false)
+  assert.equal(result.error, 'simulated network failure')
+})
+
+// --- maybePostSeasonRecordToChat — same policy shape as world-record
+// posting (reuses autoPostEnabled, no dedicated toggle), different
+// event_kind, identity keyed on the triggering race's own occurredAt
+// rather than the record's own values (see chatPoster.ts's doc comment).
+
+const seasonRecord: SeasonRecordBroken = {
+  mapName: 'speedway',
+  mapCreator: 'creator1',
+  racerName: 'Bob',
+  timeSeconds: 90,
+  previousTimeSeconds: 100,
+  previousRacerName: 'Alice'
+}
+const seasonRecordOccurredAt = '2026-08-19T21:38:53.535Z'
+
+test('buildSeasonRecordMessage says "season record," never "world record" — honest scope, not overclaiming', () => {
+  const message = buildSeasonRecordMessage(seasonRecord)
+  assert.match(message, /season record/i)
+  assert.doesNotMatch(message, /world record/i)
+  assert.match(message, /Bob/)
+  assert.match(message, /previous best this season: 1m 40\.0s by Alice/)
+})
+
+test('buildSeasonRecordMessage handles the first-ever-this-season case (no previous holder) without a broken sentence', () => {
+  const message = buildSeasonRecordMessage({ ...seasonRecord, previousTimeSeconds: null, previousRacerName: null })
+  assert.match(message, /first finish on this map this season/)
+})
+
+test('maybePostSeasonRecordToChat does nothing when auto-post is off (the default)', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: false })
+  let calls = 0
+  const result = await maybePostSeasonRecordToChat(seasonRecord, seasonRecordOccurredAt, async () => {
+    calls += 1
+  })
+  assert.equal(result.attempted, false)
+  assert.equal(calls, 0)
+})
+
+test('maybePostSeasonRecordToChat does nothing when enabled but nothing is connected', async () => {
+  updateSettings({ userId: null, autoPostEnabled: true })
+  const result = await maybePostSeasonRecordToChat(seasonRecord, seasonRecordOccurredAt, async () => {})
+  assert.equal(result.attempted, false)
+  assert.equal(result.error, 'Twitch is not connected')
+})
+
+test('maybePostSeasonRecordToChat sends and logs success when enabled and connected', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  const sent: { broadcasterId: string; message: string }[] = []
+  const result = await maybePostSeasonRecordToChat(seasonRecord, seasonRecordOccurredAt, async (broadcasterId, message) => {
+    sent.push({ broadcasterId, message })
+  })
+
+  assert.equal(result.attempted, true)
+  assert.equal(result.success, true)
+  assert.equal(sent.length, 1)
+  assert.match(sent[0]?.message ?? '', /season record/i)
+
+  const db = getDb()
+  const row = db.prepare(`SELECT * FROM chat_post_log WHERE event_kind = 'season_record'`).get() as { success: number }
+  assert.equal(row.success, 1)
+})
+
+test('maybePostSeasonRecordToChat never posts for the exact same triggering race twice (restart-safe dedupe)', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  let calls = 0
+  const sendFn = async (): Promise<void> => {
+    calls += 1
+  }
+
+  await maybePostSeasonRecordToChat(seasonRecord, seasonRecordOccurredAt, sendFn)
+  const second = await maybePostSeasonRecordToChat(seasonRecord, seasonRecordOccurredAt, sendFn)
+
+  assert.equal(calls, 1)
+  assert.equal(second.attempted, false)
+})
+
+test('maybePostSeasonRecordToChat fires again for a DIFFERENT triggering race (different occurredAt)', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  let calls = 0
+  const sendFn = async (): Promise<void> => {
+    calls += 1
+  }
+
+  await maybePostSeasonRecordToChat(seasonRecord, seasonRecordOccurredAt, sendFn)
+  const differentRace = await maybePostSeasonRecordToChat(seasonRecord, '2026-08-19T22:00:00.000Z', sendFn)
+
+  assert.equal(calls, 2)
+  assert.equal(differentRace.attempted, true)
+})
+
+test('maybePostSeasonRecordToChat retries exactly once on failure, then gives up and logs', async () => {
+  updateSettings({ userId: 'u1', autoPostEnabled: true })
+  let calls = 0
+  const alwaysFails = async (): Promise<void> => {
+    calls += 1
+    throw new Error('simulated network failure')
+  }
+
+  const result = await maybePostSeasonRecordToChat(seasonRecord, seasonRecordOccurredAt, alwaysFails)
 
   assert.equal(calls, 2)
   assert.equal(result.success, false)
