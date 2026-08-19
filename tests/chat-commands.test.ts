@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { initDb, closeDb } from '../src/main/backend/db/db.ts'
+import { initDb, closeDb, getDb } from '../src/main/backend/db/db.ts'
 import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
 import { setMapNote } from '../src/main/backend/db/queries/mapNotes.ts'
 import { handleChatCommand, resetCommandCooldowns } from '../src/main/backend/twitch/commands.ts'
@@ -264,6 +264,55 @@ test('!notes distinguishes "no map found" from "map exists but has no note yet"'
 
   const noNote = handleChatCommand('!notes feel the fire', ctx({ chatterId: 'b' }))
   assert.equal(noNote, 'No notes set for feel the fire yet.')
+})
+
+test('!leaderboard is friendly to someone who has never raced, not a crash or a bare zero', () => {
+  const reply = handleChatCommand('!leaderboard', ctx({ chatterName: 'totalstranger', chatterDisplayName: 'TotalStranger' }))
+  assert.match(reply ?? '', /hasn't raced yet/)
+})
+
+test('!leaderboard reports the callers own real rank, points, races, and wins', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // 49 participants, schoklad wins with 4,602 pts
+  const reply = handleChatCommand('!leaderboard', ctx())
+  assert.equal(reply, '@schoklad is #1 of 49 on the season leaderboard — 4,602 pts, 1 race, 1 win.')
+})
+
+test('!leaderboard @username looks up someone elses placement, not the callers own', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // RahHerself: 2nd place, 4,234 pts, 0 wins
+  const reply = handleChatCommand('!leaderboard @RahHerself', ctx({ chatterId: 'caller', chatterName: 'schoklad', chatterDisplayName: 'schoklad' }))
+  assert.equal(reply, '@RahHerself is #2 of 49 on the season leaderboard — 4,234 pts, 1 race, 0 wins.')
+})
+
+test('!leaderboard username also works without the leading @, same as !mystats', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const reply = handleChatCommand('!leaderboard RahHerself', ctx({ chatterId: 'caller-2' }))
+  assert.match(reply ?? '', /^@RahHerself is #2 of 49/)
+})
+
+test('!leaderboard ranks ties correctly — same rank number, next rank skips (standard leaderboard behavior, not a plain row index)', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  // 37 of the 49 fixture racers are tied at 0 points/0 wins (positions
+  // 13-49) — every one of them should show the SAME rank (13th, since 12
+  // racers have distinct nonzero points ahead of them), not a unique row
+  // number each.
+  const a = handleChatCommand('!leaderboard @Alcarcalimo', ctx({ chatterId: 'x' }))
+  const b = handleChatCommand('!leaderboard @duftin', ctx({ chatterId: 'y' }))
+  assert.match(a ?? '', /^@Alcarcalimo is #13 of 49/)
+  assert.match(b ?? '', /^@duftin is #13 of 49/)
+})
+
+test('!leaderboard tells apart "never raced at all" from "raced before, not yet this season"', () => {
+  // Ingest into a real (non-bootstrap) season, then ask about someone whose
+  // only appearance is there — getOpenSeasonId() with no seasons rows
+  // present resolves to the bootstrap NULL season, which is a DIFFERENT
+  // scope than a real season id would be, so this exercises the same
+  // "exists in racers, absent from THIS season's standings" gap it would
+  // hit in production once a real season is open.
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const db = getDb()
+  db.exec(`INSERT INTO seasons (season_number, source, started_at) VALUES (99, 'manual_override', '2026-01-01T00:00:00.000Z')`)
+  const reply = handleChatCommand('!leaderboard', ctx())
+  assert.match(reply ?? '', /hasn't raced this season yet/)
 })
 
 test('cooldown expires after enough time passes', () => {

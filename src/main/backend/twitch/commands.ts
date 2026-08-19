@@ -5,7 +5,7 @@ import {
   racerHasEverRaced,
   getRacerDisplayName
 } from '../db/queries/racerStats.ts'
-import { getTodayLeaderboard, getLeaderboard } from '../db/queries/leaderboard.ts'
+import { getTodayLeaderboard, getLeaderboard, getRacerLeaderboardPosition } from '../db/queries/leaderboard.ts'
 import { getMapRecords, getLastMapSummary } from '../db/queries/mapRecords.ts'
 import { getMapNotes } from '../db/queries/mapNotes.ts'
 import { getSeasonStats, getSeasonRaceHighScore } from '../db/queries/stats.ts'
@@ -44,7 +44,8 @@ const COMMANDS: Record<string, CommandDef> = {
   '!racehs': { cooldownScope: 'global', cooldownMs: 15_000, handler: raceHs },
   '!ghostballs': { cooldownScope: 'user', cooldownMs: 10_000, handler: ghostBalls },
   '!lastmap': { cooldownScope: 'global', cooldownMs: 15_000, handler: lastMap },
-  '!notes': { cooldownScope: 'user', cooldownMs: 10_000, handler: mapNotesCommand }
+  '!notes': { cooldownScope: 'user', cooldownMs: 10_000, handler: mapNotesCommand },
+  '!leaderboard': { cooldownScope: 'user', cooldownMs: 10_000, handler: leaderboard }
 }
 
 let lastTriggered = new Map<string, number>()
@@ -133,6 +134,38 @@ function myWins(args: string, ctx: ChatCommandContext): string {
   const wins = getRacerSeasonWins(target.username, getOpenSeasonId())
   const winWord = wins === 1 ? 'win' : 'wins'
   return `@${target.displayName} has ${wins} ${winWord} this season.`
+}
+
+/**
+ * Noah's ask: "!leaderboard command that shows the user their position on
+ * the leaderboard... anyone can use it to check someone elses placement
+ * too by adding @ their name." Same resolveTarget/cross-lookup pattern as
+ * !mystats. Season-scoped (not "today") — a running standing is what
+ * "your position on the leaderboard" means on the main Leaderboard page
+ * and !top10season; a same-day-only rank resets too often to be a
+ * meaningful "position."
+ *
+ * Deliberately checks racerHasEverRaced (all-time) THEN
+ * getRacerLeaderboardPosition (this season specifically) as two separate
+ * steps, not one — a racer who raced in an earlier season but hasn't yet
+ * this one passes the first check but fails the second, and that's a
+ * different, more specific thing to tell them than "you've never raced."
+ */
+function leaderboard(args: string, ctx: ChatCommandContext): string {
+  const target = resolveTarget(args, ctx)
+  if (!racerHasEverRaced(target.username)) {
+    return `@${target.displayName} hasn't raced yet — hop in with !play!`
+  }
+  const pos = getRacerLeaderboardPosition(target.username, getOpenSeasonId())
+  if (!pos) {
+    return `@${target.displayName} hasn't raced this season yet — hop in with !play!`
+  }
+  const raceWord = pos.racesPlayed === 1 ? 'race' : 'races'
+  const winWord = pos.wins === 1 ? 'win' : 'wins'
+  return (
+    `@${target.displayName} is #${pos.rank} of ${pos.totalRacers} on the season leaderboard — ` +
+    `${formatFullNumber(pos.totalPoints)} pts, ${pos.racesPlayed} ${raceWord}, ${pos.wins} ${winWord}.`
+  )
 }
 
 function top10Today(): string {

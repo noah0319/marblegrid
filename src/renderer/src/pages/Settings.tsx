@@ -485,6 +485,11 @@ export default function Settings(): React.JSX.Element {
                 yourself
               </li>
               <li>
+                <span className="settings__mono">!leaderboard</span> — your rank on the season
+                leaderboard (add <span className="settings__mono">@username</span> to check someone
+                else&apos;s)
+              </li>
+              <li>
                 <span className="settings__mono">!top10today</span> — today&apos;s top 10
               </li>
               <li>
