@@ -313,5 +313,24 @@ CREATE TABLE IF NOT EXISTS custom_map_records (
   UNIQUE(map_name, map_creator)
 );
 `
+  },
+  {
+    // Real bug, reported live (2026-09-15): the Ghost Ball tab going slow or
+    // never loading as more maps/races pile up. Measured against Noah's real
+    // db before touching anything — getMapRecords()'s per-map best-time query
+    // took ~3.8s at just 265 races / 99 maps (EXPLAIN QUERY PLAN showed a full
+    // SCAN of race_participants with a CORRELATED SCALAR SUBQUERY re-running
+    // per qualifying row, because nothing indexed race_events by map). That
+    // query's been rewritten (see getMapRecords in mapRecords.ts) to compute
+    // each map's best time once instead of per-row, but the rewrite still
+    // joins back to race_events by (map_name, map_creator) COLLATE NOCASE,
+    // same as getMapCommunityStats and getKnownMaps already do — all three
+    // benefit from this index existing, not just the one that was actually
+    // timed. journal_mode is WAL already (see db.ts), so adding an index here
+    // doesn't block the app that's live-reading/writing this file.
+    id: '008_race_events_map_index',
+    sql: `
+CREATE INDEX IF NOT EXISTS idx_race_events_map ON race_events(map_name COLLATE NOCASE, map_creator COLLATE NOCASE);
+`
   }
 ]

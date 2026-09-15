@@ -65,13 +65,37 @@ interface OverrideRow {
  *    with or without any real captured plays. timesPlayed still reflects
  *    reality even when overridden; only the racer/time can be overridden,
  *    not how many times it's actually been raced.
+ *
+ * The "computed" query below used to find each map's best time with a
+ * CORRELATED subquery (re-running a MIN() scan per candidate row instead of
+ * once per map) and no index backing the map_name/map_creator lookup it
+ * needed. Real, measured bug (2026-09-15): ~3.8s on Noah's live db at just
+ * 265 races / 99 maps, and — because node:sqlite is synchronous — that
+ * blocked the ENTIRE app (chat replies, race ingestion, the WebSocket) for
+ * the whole 3.8s on every Ghost Ball tab open/switch, not just the tab
+ * itself. Rewritten below to compute each map's best time ONCE (the `best`
+ * CTE) and join back to it, same idea as getMapCommunityStats' single-pass
+ * GROUP BY. Paired with migration 008's index on race_events(map_name,
+ * map_creator). Deliberately preserves the original's exact semantics
+ * (including its one quirk: the per-map minimum itself isn't filtered to
+ * positive times, only the outer row is — kept as-is rather than
+ * "improved" as a drive-by change) — verified via the full existing
+ * map-records.test.ts suite passing unchanged, not just by inspection.
  */
 export function getMapRecords(): MapRecord[] {
   const db = getDb()
 
   const computed = db
     .prepare(
-      `SELECT
+      `WITH best AS (
+         SELECT re.map_name as mapName, re.map_creator as mapCreator,
+                MIN(rp.time_in_race_seconds) as bestTime
+         FROM race_participants rp
+         JOIN race_events re ON re.id = rp.race_event_id
+         WHERE rp.eliminated = 0
+         GROUP BY re.map_name COLLATE NOCASE, re.map_creator COLLATE NOCASE
+       )
+       SELECT
          re.map_name as mapName,
          re.map_creator as mapCreator,
          r.display_name as racerName,
@@ -80,17 +104,12 @@ export function getMapRecords(): MapRecord[] {
        FROM race_participants rp
        JOIN race_events re ON re.id = rp.race_event_id
        JOIN racers r ON r.id = rp.racer_id
+       JOIN best ON best.mapName = re.map_name COLLATE NOCASE
+                 AND best.mapCreator = re.map_creator COLLATE NOCASE
+                 AND best.bestTime = rp.time_in_race_seconds
        WHERE rp.eliminated = 0
          AND rp.time_in_race_seconds IS NOT NULL
          AND rp.time_in_race_seconds > 0
-         AND rp.time_in_race_seconds = (
-           SELECT MIN(rp2.time_in_race_seconds)
-           FROM race_participants rp2
-           JOIN race_events re2 ON re2.id = rp2.race_event_id
-           WHERE re2.map_name = re.map_name COLLATE NOCASE
-             AND re2.map_creator = re.map_creator COLLATE NOCASE
-             AND rp2.eliminated = 0
-         )
        GROUP BY re.map_name COLLATE NOCASE, re.map_creator COLLATE NOCASE`
     )
     .all() as unknown as ComputedRow[]
