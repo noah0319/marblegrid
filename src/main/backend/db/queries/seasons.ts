@@ -34,7 +34,12 @@ export function openSeasonFromFilename(seasonNumber: number, savFilename: string
   }
 }
 
-/** Manual override from Settings — takes precedence until cleared or superseded by a detected file. */
+/**
+ * Manual override — takes precedence until cleared or superseded by a
+ * detected file. Currently triggered by the broadcaster/mod-only
+ * !seasonreset chat command (see twitch/commands.ts); not yet wired to a
+ * Settings UI control, though the source enum below already anticipates one.
+ */
 export function setManualSeasonOverride(seasonNumber: number): void {
   const db = getDb()
   const now = new Date().toISOString()

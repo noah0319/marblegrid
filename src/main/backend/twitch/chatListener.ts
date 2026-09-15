@@ -49,7 +49,12 @@ export function startChatListener(): void {
       const reply = handleChatCommand(event.messageText, {
         chatterId: event.chatterId,
         chatterName: event.chatterName,
-        chatterDisplayName: event.chatterDisplayName
+        chatterDisplayName: event.chatterDisplayName,
+        // Twitch's real badge set ids — confirmed against Twurple's
+        // EventSubChannelChatMessageEvent type, not guessed. Gates
+        // modOnly commands (!seasonreset) in handleChatCommand.
+        isBroadcaster: event.hasBadge('broadcaster'),
+        isModerator: event.hasBadge('moderator')
       })
       if (!reply) return
 

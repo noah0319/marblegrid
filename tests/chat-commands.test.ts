@@ -8,6 +8,8 @@ import { ingestRaceFromText } from '../src/main/backend/watcher/parsers/race.ts'
 import { setMapNote } from '../src/main/backend/db/queries/mapNotes.ts'
 import { handleChatCommand, resetCommandCooldowns } from '../src/main/backend/twitch/commands.ts'
 import type { ChatCommandContext } from '../src/main/backend/twitch/commands.ts'
+import { getOpenSeasonId } from '../src/main/backend/db/queries/seasons.ts'
+import { getSeasonStats } from '../src/main/backend/db/queries/stats.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURES_DIR = join(__dirname, 'fixtures')
@@ -20,7 +22,14 @@ const read = (name: string): string => readFileSync(join(FIXTURES_DIR, name), 'u
 // past date here would desync the day-boundary window from where the
 // ingested row actually lands and break the "today"-scoped assertions.
 function ctx(overrides: Partial<ChatCommandContext> = {}): ChatCommandContext {
-  return { chatterId: '1', chatterName: 'schoklad', chatterDisplayName: 'schoklad', ...overrides }
+  return {
+    chatterId: '1',
+    chatterName: 'schoklad',
+    chatterDisplayName: 'schoklad',
+    isBroadcaster: false,
+    isModerator: false,
+    ...overrides
+  }
 }
 
 beforeEach(() => {
@@ -327,4 +336,72 @@ test('cooldown expires after enough time passes', () => {
   assert.ok(first)
   assert.equal(tooSoon, null)
   assert.ok(later)
+})
+
+test('!seasonreset is silently ignored for a regular viewer — no reply, same as an unrecognized command', () => {
+  const reply = handleChatCommand('!seasonreset 73', ctx({ isBroadcaster: false, isModerator: false }))
+  assert.equal(reply, null)
+})
+
+test('!seasonreset works for a moderator, not just the broadcaster', () => {
+  const reply = handleChatCommand('!seasonreset 73', ctx({ isModerator: true }))
+  assert.match(reply ?? '', /Season 73/)
+})
+
+test('!seasonreset with no number replies with usage instead of guessing', () => {
+  const reply = handleChatCommand('!seasonreset', ctx({ isBroadcaster: true }))
+  assert.equal(reply, 'Usage: !seasonreset <season number> — e.g. !seasonreset 72')
+})
+
+test('!seasonreset with a non-numeric argument also replies with usage', () => {
+  const reply = handleChatCommand('!seasonreset schoklad', ctx({ isBroadcaster: true }))
+  assert.match(reply ?? '', /^Usage: !seasonreset/)
+})
+
+test('!seasonreset archives the old season instead of deleting it, and every season-scoped stat starts back at 0', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv'))
+  const oldSeasonId = getOpenSeasonId() // bootstrap (null) season, real 265-style data still lives under it
+
+  const reply = handleChatCommand('!seasonreset 73', ctx({ isBroadcaster: true }))
+  assert.equal(reply, '🔄 Season reset — now tracking Season 73. Season stats start fresh from 0; Ghost Balls records carry over untouched.')
+
+  const newSeasonId = getOpenSeasonId()
+  assert.notEqual(newSeasonId, oldSeasonId)
+
+  // New season starts at zero...
+  assert.equal(getSeasonStats(newSeasonId).totalCount, 0)
+  // ...but the old season's real race is still there, untouched, not deleted.
+  assert.equal(getSeasonStats(oldSeasonId).totalCount, 1)
+  assert.equal(getSeasonStats(oldSeasonId).totalPoints, 32932)
+
+  // Chat commands reflect the new season immediately too.
+  const seasonReply = handleChatCommand('!top10season', ctx({ chatterId: 'someone-else' }))
+  assert.equal(seasonReply, 'No races captured yet this season.')
+})
+
+test('!seasonreset never touches Ghost Balls — all-time map records are unaffected by a season reset', () => {
+  ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // "feel the fire" map
+  const before = handleChatCommand('!ghostballs feel the fire', ctx({ chatterId: 'a' }))
+  assert.ok(before)
+
+  handleChatCommand('!seasonreset 73', ctx({ isBroadcaster: true }))
+
+  const after = handleChatCommand('!ghostballs feel the fire', ctx({ chatterId: 'b' }))
+  assert.equal(after, before)
+})
+
+test('!seasonreset has a global cooldown — a second immediate call is ignored even from the broadcaster', () => {
+  const base = Date.now()
+  const first = handleChatCommand('!seasonreset 73', ctx({ isBroadcaster: true, now: new Date(base) }))
+  const tooSoon = handleChatCommand('!seasonreset 74', ctx({ isBroadcaster: true, now: new Date(base + 1000) }))
+  assert.ok(first)
+  assert.equal(tooSoon, null)
+})
+
+test('a denied attempt (regular viewer) does not burn the cooldown for the real mod right after', () => {
+  const base = Date.now()
+  const denied = handleChatCommand('!seasonreset 73', ctx({ isBroadcaster: false, isModerator: false, now: new Date(base) }))
+  const real = handleChatCommand('!seasonreset 73', ctx({ isBroadcaster: true, now: new Date(base + 1000) }))
+  assert.equal(denied, null)
+  assert.ok(real)
 })

@@ -512,6 +512,15 @@ export default function Settings(): React.JSX.Element {
                 for that map (Maps → Notes)
               </li>
             </ul>
+            <p className="settings__hint">Broadcaster/mod-only — everyone else is silently ignored:</p>
+            <ul className="settings__commands">
+              <li>
+                <span className="settings__mono">!seasonreset &lt;number&gt;</span> — e.g.{' '}
+                <span className="settings__mono">!seasonreset 73</span>. Archives the current season and starts
+                a new one at 0: every season stat (points, races, wins, leaderboard, Race HS/BR HS) resets, but
+                Ghost Balls map records are untouched. Old season data is archived, never deleted.
+              </li>
+            </ul>
           </>
         )}
       </section>

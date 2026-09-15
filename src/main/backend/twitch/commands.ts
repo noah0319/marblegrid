@@ -9,7 +9,7 @@ import { getTodayLeaderboard, getLeaderboard, getRacerLeaderboardPosition } from
 import { getMapRecords, getLastMapSummary } from '../db/queries/mapRecords.ts'
 import { getMapNotes } from '../db/queries/mapNotes.ts'
 import { getSeasonStats, getSeasonRaceHighScore } from '../db/queries/stats.ts'
-import { getOpenSeasonId } from '../db/queries/seasons.ts'
+import { getOpenSeasonId, setManualSeasonOverride } from '../db/queries/seasons.ts'
 import { getAppSettings } from '../appSettingsStore.ts'
 import { buildLastMapMessage } from './messageTemplates.ts'
 import { formatFullNumber, formatSeconds } from '../../../shared/format.ts'
@@ -22,6 +22,9 @@ export interface ChatCommandContext {
   chatterId: string
   chatterName: string
   chatterDisplayName: string
+  /** From the chatter's EventSub chat badges (chatListener.ts's event.hasBadge) — gates modOnly commands. */
+  isBroadcaster: boolean
+  isModerator: boolean
   now?: Date
 }
 
@@ -29,6 +32,8 @@ interface CommandDef {
   /** Per-user cooldown (different callers are independent) vs global (whole channel shares one window) — personalized answers use per-user, "same answer for everyone" commands use global. */
   cooldownScope: 'user' | 'global'
   cooldownMs: number
+  /** Restricts to broadcaster/moderator chatters. Everyone else is silently ignored, same as an unrecognized command — only !seasonreset uses this so far; every other command here is a safe read. */
+  modOnly?: boolean
   handler: (args: string, ctx: ChatCommandContext) => string
 }
 
@@ -45,7 +50,8 @@ const COMMANDS: Record<string, CommandDef> = {
   '!ghostballs': { cooldownScope: 'user', cooldownMs: 10_000, handler: ghostBalls },
   '!lastmap': { cooldownScope: 'global', cooldownMs: 15_000, handler: lastMap },
   '!notes': { cooldownScope: 'user', cooldownMs: 10_000, handler: mapNotesCommand },
-  '!leaderboard': { cooldownScope: 'user', cooldownMs: 10_000, handler: leaderboard }
+  '!leaderboard': { cooldownScope: 'user', cooldownMs: 10_000, handler: leaderboard },
+  '!seasonreset': { cooldownScope: 'global', cooldownMs: 30_000, modOnly: true, handler: seasonReset }
 }
 
 let lastTriggered = new Map<string, number>()
@@ -73,6 +79,12 @@ export function handleChatCommand(messageText: string, ctx: ChatCommandContext):
 
   const def = COMMANDS[commandWord]
   if (!def) return null
+
+  // Silent no-op for anyone lacking permission — same as an unrecognized
+  // command, so a random viewer probing for this learns nothing either way.
+  // Checked BEFORE the cooldown write below so a non-mod trying it can't
+  // burn the real cooldown window for an actual mod/broadcaster.
+  if (def.modOnly && !ctx.isBroadcaster && !ctx.isModerator) return null
 
   const cooldownKey = `${commandWord}:${def.cooldownScope === 'user' ? ctx.chatterId : 'global'}`
   const now = (ctx.now ?? new Date()).getTime()
@@ -278,4 +290,40 @@ function mapNotesCommand(args: string): string {
     .join(', ')
   const more = withNotes.length > 5 ? `, +${withNotes.length - 5} more` : ''
   return `Multiple noted maps match "${args}": ${names}${more} — try being more specific.`
+}
+
+/**
+ * Noah's ask: a manual season-reset trigger for chat, for whenever the
+ * game's real season has actually changed but MarbleGrid hasn't (or
+ * shouldn't) pick that up from a Sessions\*.sav filename — confirmed live
+ * that the file-derived number can't always be trusted on its own (00 Game
+ * & Data Reference documents a real MyStats/file-number mismatch). Mod/
+ * broadcaster-only (enforced in handleChatCommand) — this is the one
+ * command here that mutates real data instead of just reading it.
+ *
+ * Requires an explicit season number rather than guessing or
+ * auto-incrementing: the whole reason this command needs to exist is that
+ * the automatic number can't be blindly trusted, so silently inferring one
+ * here would risk repeating that exact mistake.
+ *
+ * Reuses setManualSeasonOverride — the same close-current/open-new pattern
+ * every automatic rollover already goes through (seasonDetector.ts). This
+ * ARCHIVES the old season (stamps its ended_at, keeps every row forever for
+ * 03 Season & Stats Archive); it never deletes anything. Every season-scoped
+ * stat (Dashboard, Leaderboard, the OBS overlay, !mystats/!top10season/
+ * !racehs/!leaderboard/etc.) reads through getOpenSeasonId() and goes back
+ * to zero the instant the new season row exists — no per-stat bookkeeping
+ * needed here. Ghost Balls (custom_map_records / getMapRecords /
+ * !ghostballs) is untouched by design: it was never season-scoped to begin
+ * with (see mapRecords.ts) — exactly the "minus ghost maps times" Noah
+ * asked for, with nothing extra to implement.
+ */
+function seasonReset(args: string): string {
+  const seasonNumber = Number.parseInt(args, 10)
+  if (!args || !Number.isInteger(seasonNumber) || seasonNumber <= 0) {
+    return 'Usage: !seasonreset <season number> — e.g. !seasonreset 72'
+  }
+
+  setManualSeasonOverride(seasonNumber)
+  return `🔄 Season reset — now tracking Season ${seasonNumber}. Season stats start fresh from 0; Ghost Balls records carry over untouched.`
 }
