@@ -317,6 +317,17 @@ function mapNotesCommand(args: string): string {
  * !ghostballs) is untouched by design: it was never season-scoped to begin
  * with (see mapRecords.ts) — exactly the "minus ghost maps times" Noah
  * asked for, with nothing extra to implement.
+ *
+ * setManualSeasonOverride is wrapped in try/catch, unlike every other
+ * command here — real gap found investigating a live report (2026-09-15):
+ * a mod/broadcaster's !seasonreset produced zero reply on a remote install,
+ * and there was no way to find out why. Packaged builds have no visible
+ * console and this app has no log file anywhere, so an uncaught exception
+ * here doesn't just fail, it vanishes — undiagnosable on a machine that
+ * isn't Noah's own. If setManualSeasonOverride ever throws, the error
+ * message itself becomes the diagnostic, posted directly to chat instead
+ * of swallowed: safe to expose real detail since this command is already
+ * mod/broadcaster-only, not shown to anyone who couldn't have triggered it.
  */
 function seasonReset(args: string): string {
   const seasonNumber = Number.parseInt(args, 10)
@@ -324,6 +335,12 @@ function seasonReset(args: string): string {
     return 'Usage: !seasonreset <season number> — e.g. !seasonreset 72'
   }
 
-  setManualSeasonOverride(seasonNumber)
+  try {
+    setManualSeasonOverride(seasonNumber)
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    return `⚠️ Season reset failed: ${detail}`
+  }
+
   return `🔄 Season reset — now tracking Season ${seasonNumber}. Season stats start fresh from 0; Ghost Balls records carry over untouched.`
 }

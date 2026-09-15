@@ -379,6 +379,20 @@ test('!seasonreset archives the old season instead of deleting it, and every sea
   assert.equal(seasonReply, 'No races captured yet this season.')
 })
 
+test('!seasonreset replies with the real error instead of failing silently, if the reset itself throws', () => {
+  // Real gap found investigating a live report (2026-09-15): a remote
+  // install's !seasonreset produced zero reply, with no console and no log
+  // file to explain why. Forces a realistic failure (closeDb() makes the
+  // next getDb() call throw "Database not initialized", the same error
+  // shape any real DB failure would produce) and confirms the command
+  // replies with the actual detail rather than the exception vanishing.
+  closeDb()
+  const reply = handleChatCommand('!seasonreset 73', ctx({ isBroadcaster: true }))
+  assert.match(reply ?? '', /^⚠️ Season reset failed: /)
+  assert.match(reply ?? '', /Database not initialized/)
+  initDb(':memory:') // restore a working db so afterEach's closeDb() has something real to close
+})
+
 test('!seasonreset never touches Ghost Balls — all-time map records are unaffected by a season reset', () => {
   ingestRaceFromText(read('race-summary-sample.csv'), read('race-participants-sample.csv')) // "feel the fire" map
   const before = handleChatCommand('!ghostballs feel the fire', ctx({ chatterId: 'a' }))

@@ -46,23 +46,39 @@ export function startChatListener(): void {
     })
 
     const subscription = newListener.onChannelChatMessage(broadcasterId, broadcasterId, (event) => {
-      const reply = handleChatCommand(event.messageText, {
-        chatterId: event.chatterId,
-        chatterName: event.chatterName,
-        chatterDisplayName: event.chatterDisplayName,
-        // Twitch's real badge set ids — confirmed against Twurple's
-        // EventSubChannelChatMessageEvent type, not guessed. Gates
-        // modOnly commands (!seasonreset) in handleChatCommand.
-        isBroadcaster: event.hasBadge('broadcaster'),
-        isModerator: event.hasBadge('moderator')
-      })
-      if (!reply) return
+      // Real gap found investigating a live report (2026-09-15): !seasonreset
+      // produced zero reply on a remote install, with no console and no log
+      // file anywhere to explain why. commands.ts's own handlers are mostly
+      // pure reads that shouldn't throw, but this is the actual boundary
+      // where a real Twitch event meets that code — an uncaught exception
+      // here would vanish silently rather than crash anything visibly.
+      // seasonReset now catches its own error and replies with the detail
+      // (see commands.ts); this is the general safety net underneath that,
+      // covering anything else that might throw (badge access, a future
+      // command, etc.) so a failure is at minimum always logged, never just
+      // gone.
+      try {
+        const reply = handleChatCommand(event.messageText, {
+          chatterId: event.chatterId,
+          chatterName: event.chatterName,
+          chatterDisplayName: event.chatterDisplayName,
+          // Twitch's real badge set ids — confirmed against Twurple's
+          // EventSubChannelChatMessageEvent type, not guessed. Gates
+          // modOnly commands (!seasonreset) in handleChatCommand.
+          isBroadcaster: event.hasBadge('broadcaster'),
+          isModerator: event.hasBadge('moderator')
+        })
+        if (!reply) return
 
-      // Routes through the bot account if one's connected, else Noah's own.
-      sendChatMessageAsConfigured(broadcasterId, reply).catch((err: unknown) => {
+        // Routes through the bot account if one's connected, else Noah's own.
+        sendChatMessageAsConfigured(broadcasterId, reply).catch((err: unknown) => {
+          // eslint-disable-next-line no-console
+          console.error('MarbleGrid: failed to send chat command reply:', err)
+        })
+      } catch (err) {
         // eslint-disable-next-line no-console
-        console.error('MarbleGrid: failed to send chat command reply:', err)
-      })
+        console.error('MarbleGrid: chat command handling threw unexpectedly:', err)
+      }
     })
 
     newListener.onSubscriptionCreateSuccess((sub) => {
