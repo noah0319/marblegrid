@@ -45,6 +45,13 @@ export default function Dashboard(): React.JSX.Element {
       ) : (
         <div className="dashboard__grid">
           <StatTile label="Total Points" value={formatCompactNumber(stats.totalPoints)} tone="accent" />
+          {/* Noah's ask: total races, for both Season and Today — already computed
+              server-side (RaceStats.totalCount, used internally for Avg Points),
+              just never had its own tile. Respects the existing scope toggle same
+              as every other tile here, so "daily and season" both work from one
+              tile, not two. Neutral tone: a volume figure like Avg Points, not a
+              mode-specific peak like Race HS/BR HS. */}
+          <StatTile label="Total Races" value={formatFullNumber(stats.totalCount)} />
           <StatTile label="Avg Points" value={formatFullNumber(stats.avgPoints)} />
           <StatTile label="Race HS" value={formatFullNumber(stats.raceHs)} tone="race" />
           {/* Noah's ask: "lots of streamers don't do BRs but some do" — an
